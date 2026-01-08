@@ -92,7 +92,7 @@ func (t *RequestTester) TestRequest(req *models.ParsedRequest, config *models.Va
 		StatusCode:       resp.StatusCode,
 		Headers:          make(map[string]string),
 		Body:             decodedBody, // 使用解码后的内容
-		Cookies:          resp.Cookies(),
+		Cookies:          make([]models.ResponseCookie, 0),
 		URL:              resp.Request.URL.String(),
 		Duration:         duration,
 		ContentLength:    int64(len(body)),         // 原始字节长度
@@ -106,6 +106,15 @@ func (t *RequestTester) TestRequest(req *models.ParsedRequest, config *models.Va
 		if len(values) > 0 {
 			responseData.Headers[key] = values[0]
 		}
+	}
+
+	for _, cookie := range resp.Cookies() {
+		responseData.Cookies = append(responseData.Cookies, models.ResponseCookie{
+			Name:   cookie.Name,
+			Value:  cookie.Value,
+			Domain: cookie.Domain,
+			Path:   cookie.Path,
+		})
 	}
 
 	return responseData, nil

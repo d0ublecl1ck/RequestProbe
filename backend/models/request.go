@@ -1,9 +1,6 @@
 package models
 
-import (
-	"net/http"
-	"time"
-)
+import "time"
 
 // ParsedRequest 表示解析后的HTTP请求
 type ParsedRequest struct {
@@ -144,13 +141,21 @@ type ResponseData struct {
 	StatusCode       int               `json:"statusCode"`       // 状态码
 	Headers          map[string]string `json:"headers"`          // 响应头
 	Body             string            `json:"body"`             // 响应体
-	Cookies          []*http.Cookie    `json:"cookies"`          // 响应Cookie
+	Cookies          []ResponseCookie  `json:"cookies"`          // 响应Cookie
 	URL              string            `json:"url"`              // 最终URL
 	Duration         time.Duration     `json:"duration"`         // 请求耗时
 	ContentLength    int64             `json:"contentLength"`    // 响应大小（字节）
 	CharacterCount   int               `json:"characterCount"`   // 响应字符长度
 	RawBody          []byte            `json:"-"`                // 原始响应字节（不序列化到JSON）
 	DetectedEncoding string            `json:"detectedEncoding"` // 检测到的编码
+}
+
+// ResponseCookie 表示响应 Cookie（避免暴露 time.Time）
+type ResponseCookie struct {
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Domain string `json:"domain"`
+	Path   string `json:"path"`
 }
 
 // ExpressionTemplate 表示验证表达式模板
