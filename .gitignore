@@ -17,7 +17,8 @@ build/linux/
 
 # Node / frontend
 frontend/node_modules/
-frontend/dist/
+frontend/dist/*
+!frontend/dist/.keep
 frontend/wailsjs/
 frontend/package.json.md5
 npm-debug.log*
