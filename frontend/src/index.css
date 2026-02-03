@@ -110,6 +110,9 @@
 .code-block {
   @apply rounded-xl bg-slate-950/95 text-slate-100 text-xs leading-relaxed p-4;
   font-family: "Space Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .metric-card {

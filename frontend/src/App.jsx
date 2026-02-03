@@ -621,7 +621,7 @@ export default function App() {
               )}
             </Card>
 
-            <ScrollArea className="h-[calc(100vh-240px)] rounded-xl">
+            <ScrollArea className="min-w-0 h-[calc(100vh-240px)] rounded-xl">
               <div className="flex flex-col gap-6 pr-2">
                 <Card className="glass-panel fade-in-up">
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -702,11 +702,13 @@ export default function App() {
                             <TabsTrigger value="headers">响应头</TabsTrigger>
                             {singleTestResult.cookies?.length > 0 && <TabsTrigger value="cookies">Cookies</TabsTrigger>}
                           </TabsList>
-                          <TabsContent value="body" className="pt-2">
-                            <div className="rounded-xl border border-border/60 bg-white/70 p-4">
-                              <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">{singleTestResult.body}</pre>
-                            </div>
-                          </TabsContent>
+                            <TabsContent value="body" className="pt-2">
+                              <div className="rounded-xl border border-border/60 bg-white/70 p-4">
+                                <pre className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-relaxed text-slate-700">
+                                  {singleTestResult.body}
+                                </pre>
+                              </div>
+                            </TabsContent>
                           <TabsContent value="headers" className="pt-2">
                             <div className="rounded-xl border border-border/60 bg-white/70 p-3">
                               <Table>
@@ -769,9 +771,9 @@ export default function App() {
                     <CardDescription>字段必要性与整体通过率。</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {testResult ? (
-                      <>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {testResult ? (
+                        <>
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                           <div className="metric-card">
                             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">原始请求</p>
                             <Badge variant={testResult.originalPassed ? 'success' : 'destructive'} className="mt-2">
@@ -888,13 +890,13 @@ export default function App() {
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    {testResult?.simplifiedCode ? (
-                      <pre className="code-block whitespace-pre-wrap">{testResult.simplifiedCode}</pre>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
-                        完成字段分析后将显示简化代码
-                      </div>
-                    )}
+                      {testResult?.simplifiedCode ? (
+                        <pre className="code-block whitespace-pre-wrap">{testResult.simplifiedCode}</pre>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
+                          完成字段分析后将显示简化代码
+                        </div>
+                      )}
                   </CardContent>
                 </Card>
               </div>
