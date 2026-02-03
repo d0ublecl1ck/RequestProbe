@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Copy,
+  Github,
   Loader2,
   Play,
   RefreshCcw,
@@ -47,6 +48,9 @@ import {
   TestFieldNecessity,
   TestRequestOnly,
 } from '../wailsjs/go/main/App.js';
+import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
+
+const GITHUB_URL = 'https://github.com/d0ublecl1ck/RequestProbe';
 
 const defaultValidationConfig = {
   expression: '',
@@ -97,6 +101,14 @@ export default function App() {
   const [isTestRunning, setIsTestRunning] = useState(false);
   const [singleTestResult, setSingleTestResult] = useState(null);
   const [isSingleTesting, setIsSingleTesting] = useState(false);
+
+  const openGithub = async () => {
+    try {
+      await BrowserOpenURL(GITHUB_URL);
+    } catch {
+      window.open(GITHUB_URL, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -348,15 +360,20 @@ export default function App() {
                 将原始请求转成结构化测试资产，快速定位必需字段并生成可复用的 Python 代码片段。
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="outline" className="gap-2" onClick={() => copyCode(pythonCode)} disabled={!pythonCode}>
-                <Copy className="h-4 w-4" />
-                复制Python
-              </Button>
-              <Button variant="contrast" className="gap-2" onClick={parseRequest} disabled={isParsing}>
-                {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                {isParsing ? '解析中...' : '解析请求'}
-              </Button>
+            <div className="flex items-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="打开 GitHub"
+                    onClick={openGithub}
+                  >
+                    <Github className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>GitHub</TooltipContent>
+              </Tooltip>
             </div>
           </header>
 
