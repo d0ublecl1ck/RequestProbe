@@ -377,8 +377,8 @@ export default function App() {
             </div>
           </header>
 
-          <div className="grid flex-1 gap-6 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
-            <Card className="glass-panel flex h-[calc(100vh-240px)] flex-col overflow-hidden">
+          <div className="grid min-w-0 flex-1 gap-6 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
+            <Card className="glass-panel flex min-w-0 h-[calc(100vh-240px)] flex-col overflow-hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ScanSearch className="h-5 w-5 text-muted-foreground" />
@@ -639,8 +639,8 @@ export default function App() {
             </Card>
 
             <ScrollArea className="min-w-0 h-[calc(100vh-240px)] rounded-xl">
-              <div className="flex flex-col gap-6 pr-2">
-                <Card className="glass-panel fade-in-up">
+              <div className="flex min-w-0 flex-col gap-6 pr-2">
+                <Card className="glass-panel min-w-0 fade-in-up">
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
                       <CardTitle className="section-title">Python 代码</CardTitle>
@@ -662,7 +662,7 @@ export default function App() {
                       <TooltipContent>复制生成的 Python 代码</TooltipContent>
                     </Tooltip>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="min-w-0">
                     {pythonCode ? (
                       <pre className="code-block whitespace-pre-wrap">{pythonCode}</pre>
                     ) : (
@@ -673,15 +673,15 @@ export default function App() {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-panel fade-in-up" style={{ animationDelay: '80ms' }}>
+                <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '80ms' }}>
                   <CardHeader>
                     <CardTitle className="section-title">请求测试结果</CardTitle>
                     <CardDescription>单次请求测试结果与响应细节。</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="min-w-0 space-y-4">
                     {singleTestResult ? (
                       <>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <div className="metric-card">
                             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">状态码</p>
                             <Badge variant={badgeVariantByStatus(singleTestResult.statusCode)} className="mt-2">
@@ -713,8 +713,8 @@ export default function App() {
                           </Badge>
                         )}
 
-                        <Tabs defaultValue="body">
-                          <TabsList>
+                        <Tabs defaultValue="body" className="min-w-0">
+                          <TabsList className="max-w-full">
                             <TabsTrigger value="body">响应体</TabsTrigger>
                             <TabsTrigger value="headers">响应头</TabsTrigger>
                             {singleTestResult.cookies?.length > 0 && <TabsTrigger value="cookies">Cookies</TabsTrigger>}
@@ -738,7 +738,7 @@ export default function App() {
                                 <TableBody>
                                   {formatHeaders(singleTestResult.headers).map((header) => (
                                     <TableRow key={header.name}>
-                                      <TableCell className="font-medium">{header.name}</TableCell>
+                                      <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{header.name}</TableCell>
                                       <TableCell className="break-all text-muted-foreground">{header.value}</TableCell>
                                     </TableRow>
                                   ))}
@@ -761,10 +761,10 @@ export default function App() {
                                   <TableBody>
                                     {singleTestResult.cookies.map((cookie) => (
                                       <TableRow key={`${cookie.name}-${cookie.domain}`}> 
-                                        <TableCell className="font-medium">{cookie.name}</TableCell>
+                                        <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{cookie.name}</TableCell>
                                         <TableCell className="break-all text-muted-foreground">{cookie.value}</TableCell>
-                                        <TableCell className="text-muted-foreground">{cookie.domain}</TableCell>
-                                        <TableCell className="text-muted-foreground">{cookie.path}</TableCell>
+                                        <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{cookie.domain}</TableCell>
+                                        <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{cookie.path}</TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
@@ -782,15 +782,15 @@ export default function App() {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-panel fade-in-up" style={{ animationDelay: '160ms' }}>
+                <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '160ms' }}>
                   <CardHeader>
                     <CardTitle className="section-title">测试摘要</CardTitle>
                     <CardDescription>字段必要性与整体通过率。</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="min-w-0 space-y-4">
                       {testResult ? (
                         <>
-                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <div className="metric-card">
                             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">原始请求</p>
                             <Badge variant={testResult.originalPassed ? 'success' : 'destructive'} className="mt-2">
@@ -833,14 +833,14 @@ export default function App() {
                               <TableBody>
                                 {headerTestResults.map((row) => (
                                   <TableRow key={row.fieldName}>
-                                    <TableCell className="font-medium">{row.fieldName}</TableCell>
+                                    <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{row.fieldName}</TableCell>
                                     <TableCell>
                                       <Badge variant={row.isRequired ? 'destructive' : 'success'}>
                                         {row.isRequired ? '必需' : '可选'}
                                       </Badge>
                                     </TableCell>
                                     <TableCell>{row.statusCode}</TableCell>
-                                    <TableCell className="text-muted-foreground">{row.errorMsg}</TableCell>
+                                    <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{row.errorMsg}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
@@ -866,14 +866,14 @@ export default function App() {
                               <TableBody>
                                 {cookieTestResults.map((row) => (
                                   <TableRow key={row.fieldName}>
-                                    <TableCell className="font-medium">{row.fieldName}</TableCell>
+                                    <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{row.fieldName}</TableCell>
                                     <TableCell>
                                       <Badge variant={row.isRequired ? 'destructive' : 'success'}>
                                         {row.isRequired ? '必需' : '可选'}
                                       </Badge>
                                     </TableCell>
                                     <TableCell>{row.statusCode}</TableCell>
-                                    <TableCell className="text-muted-foreground">{row.errorMsg}</TableCell>
+                                    <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{row.errorMsg}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
@@ -889,7 +889,7 @@ export default function App() {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-panel fade-in-up" style={{ animationDelay: '240ms' }}>
+                <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '240ms' }}>
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
                       <CardTitle className="section-title">简化代码</CardTitle>
@@ -906,7 +906,7 @@ export default function App() {
                       复制代码
                     </Button>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="min-w-0">
                       {testResult?.simplifiedCode ? (
                         <pre className="code-block whitespace-pre-wrap">{testResult.simplifiedCode}</pre>
                       ) : (

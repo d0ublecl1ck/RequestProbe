@@ -108,7 +108,7 @@
 }
 
 .code-block {
-  @apply rounded-xl bg-slate-950/95 text-slate-100 text-xs leading-relaxed p-4;
+  @apply min-w-0 w-full max-w-full rounded-xl bg-slate-950/95 p-4 text-xs leading-relaxed text-slate-100;
   font-family: "Space Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -116,7 +116,7 @@
 }
 
 .metric-card {
-  @apply rounded-xl border border-border/70 bg-white/70 p-4 shadow-sm;
+  @apply min-w-0 rounded-xl border border-border/70 bg-white/70 p-4 shadow-sm;
 }
 
 .status-pill {

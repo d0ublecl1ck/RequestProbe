@@ -135,14 +135,14 @@ func (p *CurlRequestParser) parseCurlArgs(command string) ([]string, error) {
 
 // extractURL 提取URL
 func (p *CurlRequestParser) extractURL(args []string) string {
-	for i, arg := range args {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		if arg == "curl" {
 			continue
 		}
 		if strings.HasPrefix(arg, "-") {
-			// 跳过选项参数
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++ // 跳过选项的值
+			if p.optionConsumesValue(arg) && i+1 < len(args) {
+				i++
 			}
 			continue
 		}
@@ -159,7 +159,38 @@ func (p *CurlRequestParser) extractMethod(args []string) string {
 			return strings.ToUpper(args[i+1])
 		}
 	}
+
+	for _, arg := range args {
+		if p.isDataOption(arg) {
+			return "POST"
+		}
+	}
+
 	return "GET" // 默认方法
+}
+
+func (p *CurlRequestParser) optionConsumesValue(arg string) bool {
+	switch arg {
+	case "-X", "--request",
+		"-H", "--header",
+		"-b", "--cookie",
+		"-d", "--data", "--data-raw",
+		"-A", "--user-agent",
+		"-e", "--referer",
+		"--url":
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *CurlRequestParser) isDataOption(arg string) bool {
+	switch arg {
+	case "-d", "--data", "--data-raw":
+		return true
+	default:
+		return false
+	}
 }
 
 // extractHeaders 提取Headers
