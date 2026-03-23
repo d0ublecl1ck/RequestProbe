@@ -88,23 +88,65 @@ jobs:
           set -euo pipefail
           go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
-      - name: Build app
+      - name: Build app (macOS)
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
           wails build -clean
 
-      - name: Package artifact
+      - name: Build app (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          wails build -clean -nsis
+
+      - name: Build app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          wails build -clean
+
+      - name: Package artifact (macOS)
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          asset="RequestProbe-${{ needs.meta.outputs.tag }}-${{ runner.os }}.zip"
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            7z a "dist/$asset" "./build/bin/*"
-          else
-            (cd build/bin && zip -r "../../dist/$asset" .)
+          asset_path="$(find build/bin -maxdepth 1 -type f -name '*-macos-*.zip' -print -quit)"
+          if [ -z "$asset_path" ]; then
+            echo "No macOS zip produced under build/bin" >&2
+            exit 1
           fi
+          cp "$asset_path" "dist/RequestProbe-${{ needs.meta.outputs.tag }}-macOS.zip"
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $portableAsset = "RequestProbe-${{ needs.meta.outputs.tag }}-Windows-portable.zip"
+          $installer = Get-ChildItem -Path build/bin -Filter "*installer.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "No Windows installer generated under build/bin"
+          }
+          Copy-Item $installer.FullName "dist/RequestProbe-${{ needs.meta.outputs.tag }}-Windows-installer.exe"
+          $portableEntries = Get-ChildItem -Path build/bin | Where-Object { $_.Name -notlike "*installer.exe" }
+          if (-not $portableEntries) {
+            throw "No portable Windows build outputs generated under build/bin"
+          }
+          Compress-Archive -Path ($portableEntries | ForEach-Object FullName) -DestinationPath "dist/$portableAsset" -Force
+
+      - name: Package artifact (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          asset="RequestProbe-${{ needs.meta.outputs.tag }}-Linux.tar.gz"
+          tar -C build/bin -czf "dist/$asset" .
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
