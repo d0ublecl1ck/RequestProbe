@@ -35,6 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './components/ui/tooltip.jsx';
+import { ResourceMonitorTab } from './components/resource-monitor-tab.jsx';
 
 import {
   DetectInputType,
@@ -86,6 +87,7 @@ const badgeVariantByStatus = (statusCode) => {
 };
 
 export default function App() {
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState('request-lab');
   const [inputText, setInputText] = useState('');
   const [inputType, setInputType] = useState('auto');
   const [detectedType, setDetectedType] = useState('');
@@ -355,9 +357,9 @@ export default function App() {
           <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">RequestProbe</p>
-              <h1 className="text-3xl font-semibold text-foreground">请求解析与验证控制台</h1>
+              <h1 className="text-3xl font-semibold text-foreground">RequestProbe</h1>
               <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                将原始请求转成结构化测试资产，快速定位必需字段并生成可复用的 Python 代码片段。
+                请求资产整理、字段探测与资源监听工作台。
               </p>
             </div>
             <div className="flex items-center">
@@ -376,8 +378,21 @@ export default function App() {
               </Tooltip>
             </div>
           </header>
+          <Tabs value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab} className="flex flex-1 flex-col gap-6">
+            <TabsList className="workspace-tabs max-w-full">
+              <TabsTrigger value="request-lab">字段探针</TabsTrigger>
+              <TabsTrigger value="resource-monitor">资源监听</TabsTrigger>
+            </TabsList>
 
-          <div className="grid min-w-0 flex-1 gap-6 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
+            <TabsContent value="request-lab" className="mt-0">
+              <div className="mb-6">
+                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">字段探针</p>
+                <h2 className="mt-2 text-2xl font-semibold text-foreground">请求分析</h2>
+                <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                  将原始请求转成结构化测试资产，快速定位必需字段并生成可复用的 Python 代码片段。
+                </p>
+              </div>
+              <div className="grid min-w-0 flex-1 gap-6 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
             <Card className="glass-panel flex min-w-0 h-[calc(100vh-240px)] flex-col overflow-hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -919,6 +934,12 @@ export default function App() {
               </div>
             </ScrollArea>
           </div>
+            </TabsContent>
+
+            <TabsContent value="resource-monitor" className="mt-0">
+              <ResourceMonitorTab />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </TooltipProvider>

@@ -12,14 +12,16 @@ import (
 
 // App struct
 type App struct {
-	ctx            context.Context
-	requestService *services.RequestService
+	ctx                    context.Context
+	requestService         *services.RequestService
+	resourceMonitorService *services.ResourceMonitorService
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		requestService: services.NewRequestService(),
+		requestService:         services.NewRequestService(),
+		resourceMonitorService: services.NewResourceMonitorService(),
 	}
 }
 
@@ -27,6 +29,10 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.resourceMonitorService.SetContext(ctx)
+	a.resourceMonitorService.SetEventHandler(func(event *models.ResourceMonitorEvent) {
+		runtime.EventsEmit(a.ctx, "resource-monitor-event", event)
+	})
 }
 
 // Greet returns a greeting for the given name
@@ -203,4 +209,44 @@ func (a *App) ParseSimpleRequest(input string) map[string]interface{} {
 		"contentType": request.ContentType,
 		"status":      "success",
 	}
+}
+
+// GetCommonResourceExtensions 获取常见资源后缀
+func (a *App) GetCommonResourceExtensions() []string {
+	return a.resourceMonitorService.GetCommonResourceExtensions()
+}
+
+// GetResourceMonitorTask 获取当前资源监听任务
+func (a *App) GetResourceMonitorTask() *models.ResourceMonitorTask {
+	return a.resourceMonitorService.GetCurrentTask(a.ctx)
+}
+
+// StartResourceMonitor 启动资源监听任务
+func (a *App) StartResourceMonitor(rawURL string, extensions []string) (*models.ResourceMonitorTask, error) {
+	return a.resourceMonitorService.StartTask(a.ctx, rawURL, extensions)
+}
+
+// PauseResourceMonitor 暂停资源监听
+func (a *App) PauseResourceMonitor() (*models.ResourceMonitorTask, error) {
+	return a.resourceMonitorService.PauseTask(a.ctx)
+}
+
+// ResumeResourceMonitor 恢复资源监听
+func (a *App) ResumeResourceMonitor() (*models.ResourceMonitorTask, error) {
+	return a.resourceMonitorService.ResumeTask(a.ctx)
+}
+
+// EndResourceMonitor 结束资源监听任务
+func (a *App) EndResourceMonitor() (*models.ResourceMonitorTask, error) {
+	return a.resourceMonitorService.EndTask(a.ctx)
+}
+
+// DownloadSelectedResources 下载选中的资源
+func (a *App) DownloadSelectedResources(resourceIDs []string) (*models.DownloadResourcesResult, error) {
+	return a.resourceMonitorService.DownloadResources(a.ctx, resourceIDs)
+}
+
+// OpenResourceMonitorDownloadDir 打开资源监听下载目录
+func (a *App) OpenResourceMonitorDownloadDir(opener string) error {
+	return a.resourceMonitorService.OpenDownloadDir(a.ctx, opener)
 }
