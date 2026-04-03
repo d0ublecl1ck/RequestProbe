@@ -88,6 +88,7 @@ const badgeVariantByStatus = (statusCode) => {
 
 export default function App() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState('request-lab');
+  const [activeRightPanelTab, setActiveRightPanelTab] = useState('request-test-group');
   const [inputText, setInputText] = useState('');
   const [inputType, setInputType] = useState('auto');
   const [detectedType, setDetectedType] = useState('');
@@ -289,6 +290,7 @@ export default function App() {
       setTestResult(result);
       const stats = await GetTestStatistics(result);
       setTestStatistics(stats || {});
+      setActiveRightPanelTab('analysis-group');
       toast.success('字段分析完成');
     } catch (error) {
       const errorMessage = error?.message || error?.toString() || '未知错误';
@@ -316,6 +318,7 @@ export default function App() {
     setTestResult(null);
     setTestStatistics({});
     setSingleTestResult(null);
+    setActiveRightPanelTab('request-test-group');
     toast.success('所有内容已清空');
   };
 
@@ -654,86 +657,92 @@ export default function App() {
             </Card>
 
             <ScrollArea className="min-w-0 h-[calc(100vh-240px)] rounded-xl">
-              <div className="flex min-w-0 flex-col gap-6 pr-2">
-                <Card className="glass-panel min-w-0 fade-in-up">
-                  <CardHeader className="flex flex-row items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="section-title">Python 代码</CardTitle>
-                      <CardDescription>生成可执行的请求脚本，支持快速复用。</CardDescription>
-                    </div>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => copyCode(pythonCode)}
-                          disabled={!pythonCode}
-                        >
-                          <Copy className="h-4 w-4" />
-                          复制代码
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>复制生成的 Python 代码</TooltipContent>
-                    </Tooltip>
-                  </CardHeader>
-                  <CardContent className="min-w-0">
-                    {pythonCode ? (
-                      <pre className="code-block whitespace-pre-wrap">{pythonCode}</pre>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
-                        请先解析请求以生成 Python 代码
+              <Tabs value={activeRightPanelTab} onValueChange={setActiveRightPanelTab} className="flex min-w-0 flex-col gap-4 pr-2">
+                <TabsList className="max-w-full self-start">
+                  <TabsTrigger value="request-test-group">请求代码与测试</TabsTrigger>
+                  <TabsTrigger value="analysis-group">测试摘要与简化代码</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="request-test-group" className="mt-0 space-y-6">
+                  <Card className="glass-panel min-w-0 fade-in-up">
+                    <CardHeader className="flex flex-row items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="section-title">Python 代码</CardTitle>
+                        <CardDescription>生成可执行的请求脚本，支持快速复用。</CardDescription>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => copyCode(pythonCode)}
+                            disabled={!pythonCode}
+                          >
+                            <Copy className="h-4 w-4" />
+                            复制代码
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>复制生成的 Python 代码</TooltipContent>
+                      </Tooltip>
+                    </CardHeader>
+                    <CardContent className="min-w-0">
+                      {pythonCode ? (
+                        <pre className="code-block whitespace-pre-wrap">{pythonCode}</pre>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
+                          请先解析请求以生成 Python 代码
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '80ms' }}>
-                  <CardHeader>
-                    <CardTitle className="section-title">请求测试结果</CardTitle>
-                    <CardDescription>单次请求测试结果与响应细节。</CardDescription>
-                  </CardHeader>
-                  <CardContent className="min-w-0 space-y-4">
-                    {singleTestResult ? (
-                      <>
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">状态码</p>
-                            <Badge variant={badgeVariantByStatus(singleTestResult.statusCode)} className="mt-2">
-                              {singleTestResult.statusCode}
+                  <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '80ms' }}>
+                    <CardHeader>
+                      <CardTitle className="section-title">请求测试结果</CardTitle>
+                      <CardDescription>单次请求测试结果与响应细节。</CardDescription>
+                    </CardHeader>
+                    <CardContent className="min-w-0 space-y-4">
+                      {singleTestResult ? (
+                        <>
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">状态码</p>
+                              <Badge variant={badgeVariantByStatus(singleTestResult.statusCode)} className="mt-2">
+                                {singleTestResult.statusCode}
+                              </Badge>
+                            </div>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">响应大小</p>
+                              <p className="mt-2 text-sm font-medium">{formatBytes(singleTestResult.contentLength || 0)}</p>
+                            </div>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">响应长度</p>
+                              <p className="mt-2 text-sm font-medium">{singleTestResult.characterCount || 0} 字符</p>
+                            </div>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">耗时</p>
+                              <p className="mt-2 text-sm font-medium">{formatDuration(singleTestResult.duration)}</p>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-border/60 bg-white/70 p-4 text-sm">
+                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">最终 URL</p>
+                            <p className="mt-2 break-all font-medium text-foreground">{singleTestResult.url}</p>
+                          </div>
+
+                          {singleTestResult.detectedEncoding && (
+                            <Badge variant="info" className="status-pill">
+                              自动检测编码：{singleTestResult.detectedEncoding}
                             </Badge>
-                          </div>
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">响应大小</p>
-                            <p className="mt-2 text-sm font-medium">{formatBytes(singleTestResult.contentLength || 0)}</p>
-                          </div>
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">响应长度</p>
-                            <p className="mt-2 text-sm font-medium">{singleTestResult.characterCount || 0} 字符</p>
-                          </div>
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">耗时</p>
-                            <p className="mt-2 text-sm font-medium">{formatDuration(singleTestResult.duration)}</p>
-                          </div>
-                        </div>
+                          )}
 
-                        <div className="rounded-xl border border-border/60 bg-white/70 p-4 text-sm">
-                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">最终 URL</p>
-                          <p className="mt-2 break-all font-medium text-foreground">{singleTestResult.url}</p>
-                        </div>
-
-                        {singleTestResult.detectedEncoding && (
-                          <Badge variant="info" className="status-pill">
-                            自动检测编码：{singleTestResult.detectedEncoding}
-                          </Badge>
-                        )}
-
-                        <Tabs defaultValue="body" className="min-w-0">
-                          <TabsList className="max-w-full">
-                            <TabsTrigger value="body">响应体</TabsTrigger>
-                            <TabsTrigger value="headers">响应头</TabsTrigger>
-                            {singleTestResult.cookies?.length > 0 && <TabsTrigger value="cookies">Cookies</TabsTrigger>}
-                          </TabsList>
+                          <Tabs defaultValue="body" className="min-w-0">
+                            <TabsList className="max-w-full">
+                              <TabsTrigger value="body">响应体</TabsTrigger>
+                              <TabsTrigger value="headers">响应头</TabsTrigger>
+                              {singleTestResult.cookies?.length > 0 && <TabsTrigger value="cookies">Cookies</TabsTrigger>}
+                            </TabsList>
                             <TabsContent value="body" className="pt-2">
                               <div className="rounded-xl border border-border/60 bg-white/70 p-4">
                                 <pre className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-relaxed text-slate-700">
@@ -741,187 +750,188 @@ export default function App() {
                                 </pre>
                               </div>
                             </TabsContent>
-                          <TabsContent value="headers" className="pt-2">
-                            <div className="rounded-xl border border-border/60 bg-white/70 p-3">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="w-[180px]">名称</TableHead>
-                                    <TableHead>值</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {formatHeaders(singleTestResult.headers).map((header) => (
-                                    <TableRow key={header.name}>
-                                      <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{header.name}</TableCell>
-                                      <TableCell className="break-all text-muted-foreground">{header.value}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </TabsContent>
-                          {singleTestResult.cookies?.length > 0 && (
-                            <TabsContent value="cookies" className="pt-2">
+                            <TabsContent value="headers" className="pt-2">
                               <div className="rounded-xl border border-border/60 bg-white/70 p-3">
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
-                                      <TableHead className="w-[140px]">名称</TableHead>
+                                      <TableHead className="w-[180px]">名称</TableHead>
                                       <TableHead>值</TableHead>
-                                      <TableHead className="w-[160px]">域名</TableHead>
-                                      <TableHead className="w-[120px]">路径</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {singleTestResult.cookies.map((cookie) => (
-                                      <TableRow key={`${cookie.name}-${cookie.domain}`}> 
-                                        <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{cookie.name}</TableCell>
-                                        <TableCell className="break-all text-muted-foreground">{cookie.value}</TableCell>
-                                        <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{cookie.domain}</TableCell>
-                                        <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{cookie.path}</TableCell>
+                                    {formatHeaders(singleTestResult.headers).map((header) => (
+                                      <TableRow key={header.name}>
+                                        <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{header.name}</TableCell>
+                                        <TableCell className="break-all text-muted-foreground">{header.value}</TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
                                 </Table>
                               </div>
                             </TabsContent>
-                          )}
-                        </Tabs>
-                      </>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
-                        请先解析请求进行测试
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                            {singleTestResult.cookies?.length > 0 && (
+                              <TabsContent value="cookies" className="pt-2">
+                                <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-[140px]">名称</TableHead>
+                                        <TableHead>值</TableHead>
+                                        <TableHead className="w-[160px]">域名</TableHead>
+                                        <TableHead className="w-[120px]">路径</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {singleTestResult.cookies.map((cookie) => (
+                                        <TableRow key={`${cookie.name}-${cookie.domain}`}>
+                                          <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{cookie.name}</TableCell>
+                                          <TableCell className="break-all text-muted-foreground">{cookie.value}</TableCell>
+                                          <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{cookie.domain}</TableCell>
+                                          <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{cookie.path}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </TabsContent>
+                            )}
+                          </Tabs>
+                        </>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
+                          请先解析请求进行测试
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-                <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '160ms' }}>
-                  <CardHeader>
-                    <CardTitle className="section-title">测试摘要</CardTitle>
-                    <CardDescription>字段必要性与整体通过率。</CardDescription>
-                  </CardHeader>
-                  <CardContent className="min-w-0 space-y-4">
+                <TabsContent value="analysis-group" className="mt-0 space-y-6">
+                  <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '160ms' }}>
+                    <CardHeader>
+                      <CardTitle className="section-title">测试摘要</CardTitle>
+                      <CardDescription>字段必要性与整体通过率。</CardDescription>
+                    </CardHeader>
+                    <CardContent className="min-w-0 space-y-4">
                       {testResult ? (
                         <>
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">原始请求</p>
-                            <Badge variant={testResult.originalPassed ? 'success' : 'destructive'} className="mt-2">
-                              {testResult.originalPassed ? '通过' : '失败'}
-                            </Badge>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">原始请求</p>
+                              <Badge variant={testResult.originalPassed ? 'success' : 'destructive'} className="mt-2">
+                                {testResult.originalPassed ? '通过' : '失败'}
+                              </Badge>
+                            </div>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">必需Headers</p>
+                              <p className="mt-2 text-sm font-medium">
+                                {testResultSummary?.requiredHeaders || 0} / {testResultSummary?.totalHeaders || 0}
+                              </p>
+                            </div>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">必需Cookies</p>
+                              <p className="mt-2 text-sm font-medium">
+                                {testResultSummary?.requiredCookies || 0} / {testResultSummary?.totalCookies || 0}
+                              </p>
+                            </div>
+                            <div className="metric-card">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">测试耗时</p>
+                              <p className="mt-2 text-sm font-medium">{formatDuration(testResult.testDuration)}</p>
+                            </div>
                           </div>
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">必需Headers</p>
-                            <p className="mt-2 text-sm font-medium">
-                              {testResultSummary?.requiredHeaders || 0} / {testResultSummary?.totalHeaders || 0}
-                            </p>
-                          </div>
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">必需Cookies</p>
-                            <p className="mt-2 text-sm font-medium">
-                              {testResultSummary?.requiredCookies || 0} / {testResultSummary?.totalCookies || 0}
-                            </p>
-                          </div>
-                          <div className="metric-card">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">测试耗时</p>
-                            <p className="mt-2 text-sm font-medium">{formatDuration(testResult.testDuration)}</p>
-                          </div>
+
+                          {headerTestResults.length > 0 && (
+                            <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+                              <div className="mb-3 flex items-center justify-between">
+                                <p className="text-sm font-semibold">Headers 测试结果</p>
+                                <Badge variant="outline">{headerTestResults.length} 条</Badge>
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[200px]">Header名称</TableHead>
+                                    <TableHead className="w-[120px]">是否必需</TableHead>
+                                    <TableHead className="w-[100px]">状态码</TableHead>
+                                    <TableHead>错误信息</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {headerTestResults.map((row) => (
+                                    <TableRow key={row.fieldName}>
+                                      <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{row.fieldName}</TableCell>
+                                      <TableCell>
+                                        <Badge variant={row.isRequired ? 'destructive' : 'success'}>
+                                          {row.isRequired ? '必需' : '可选'}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>{row.statusCode}</TableCell>
+                                      <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{row.errorMsg}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+
+                          {cookieTestResults.length > 0 && (
+                            <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+                              <div className="mb-3 flex items-center justify-between">
+                                <p className="text-sm font-semibold">Cookies 测试结果</p>
+                                <Badge variant="outline">{cookieTestResults.length} 条</Badge>
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[200px]">Cookie名称</TableHead>
+                                    <TableHead className="w-[120px]">是否必需</TableHead>
+                                    <TableHead className="w-[100px]">状态码</TableHead>
+                                    <TableHead>错误信息</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {cookieTestResults.map((row) => (
+                                    <TableRow key={row.fieldName}>
+                                      <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{row.fieldName}</TableCell>
+                                      <TableCell>
+                                        <Badge variant={row.isRequired ? 'destructive' : 'success'}>
+                                          {row.isRequired ? '必需' : '可选'}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>{row.statusCode}</TableCell>
+                                      <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{row.errorMsg}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
+                          请先进行字段分析测试
                         </div>
-
-                        {headerTestResults.length > 0 && (
-                          <div className="rounded-xl border border-border/60 bg-white/70 p-3">
-                            <div className="mb-3 flex items-center justify-between">
-                              <p className="text-sm font-semibold">Headers 测试结果</p>
-                              <Badge variant="outline">{headerTestResults.length} 条</Badge>
-                            </div>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[200px]">Header名称</TableHead>
-                                  <TableHead className="w-[120px]">是否必需</TableHead>
-                                  <TableHead className="w-[100px]">状态码</TableHead>
-                                  <TableHead>错误信息</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {headerTestResults.map((row) => (
-                                  <TableRow key={row.fieldName}>
-                                    <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{row.fieldName}</TableCell>
-                                    <TableCell>
-                                      <Badge variant={row.isRequired ? 'destructive' : 'success'}>
-                                        {row.isRequired ? '必需' : '可选'}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>{row.statusCode}</TableCell>
-                                    <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{row.errorMsg}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-
-                        {cookieTestResults.length > 0 && (
-                          <div className="rounded-xl border border-border/60 bg-white/70 p-3">
-                            <div className="mb-3 flex items-center justify-between">
-                              <p className="text-sm font-semibold">Cookies 测试结果</p>
-                              <Badge variant="outline">{cookieTestResults.length} 条</Badge>
-                            </div>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[200px]">Cookie名称</TableHead>
-                                  <TableHead className="w-[120px]">是否必需</TableHead>
-                                  <TableHead className="w-[100px]">状态码</TableHead>
-                                  <TableHead>错误信息</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {cookieTestResults.map((row) => (
-                                  <TableRow key={row.fieldName}>
-                                    <TableCell className="break-all font-medium [overflow-wrap:anywhere]">{row.fieldName}</TableCell>
-                                    <TableCell>
-                                      <Badge variant={row.isRequired ? 'destructive' : 'success'}>
-                                        {row.isRequired ? '必需' : '可选'}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>{row.statusCode}</TableCell>
-                                    <TableCell className="break-all text-muted-foreground [overflow-wrap:anywhere]">{row.errorMsg}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border bg-white/70 px-6 py-10 text-center text-sm text-muted-foreground">
-                        请先进行字段分析测试
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '240ms' }}>
+                    <CardHeader className="flex flex-row items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="section-title">简化代码</CardTitle>
+                        <CardDescription>字段必要性分析后生成的精简版本。</CardDescription>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '240ms' }}>
-                  <CardHeader className="flex flex-row items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="section-title">简化代码</CardTitle>
-                      <CardDescription>字段必要性分析后生成的精简版本。</CardDescription>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => copyCode(testResult?.simplifiedCode)}
-                      disabled={!testResult?.simplifiedCode}
-                    >
-                      <Copy className="h-4 w-4" />
-                      复制代码
-                    </Button>
-                  </CardHeader>
-                  <CardContent className="min-w-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => copyCode(testResult?.simplifiedCode)}
+                        disabled={!testResult?.simplifiedCode}
+                      >
+                        <Copy className="h-4 w-4" />
+                        复制代码
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="min-w-0">
                       {testResult?.simplifiedCode ? (
                         <pre className="code-block whitespace-pre-wrap">{testResult.simplifiedCode}</pre>
                       ) : (
@@ -929,9 +939,10 @@ export default function App() {
                           完成字段分析后将显示简化代码
                         </div>
                       )}
-                  </CardContent>
-                </Card>
-              </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </ScrollArea>
           </div>
             </TabsContent>
