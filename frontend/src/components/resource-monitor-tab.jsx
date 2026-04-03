@@ -19,7 +19,6 @@ import { Button } from './ui/button.jsx';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from './ui/card.jsx';
@@ -297,7 +296,6 @@ export function ResourceMonitorTab() {
               <Link2 className="h-5 w-5 text-emerald-500" />
               监听任务
             </CardTitle>
-            <CardDescription>URL 可选。不填时只打开浏览器并开始监听，后续可手动访问目标页面。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-2">
@@ -345,9 +343,6 @@ export function ResourceMonitorTab() {
               <span>任务状态</span>
               <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
             </CardTitle>
-            <CardDescription className="monitor-status-description">
-              停止监听不会关闭浏览器，只有结束任务才会关闭浏览器。
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -470,7 +465,6 @@ export function ResourceMonitorTab() {
         <CardHeader className="flex flex-col gap-3 border-b border-border/60 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle>命中资源列表</CardTitle>
-            <CardDescription>按内容哈希去重。只有你手动勾选后才会下载到当前任务目录。</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -566,7 +560,7 @@ export function ResourceMonitorTab() {
             </ScrollArea>
           ) : (
             <div className="flex h-[calc(100vh-320px)] items-center justify-center px-8 text-center text-sm text-muted-foreground">
-              启动监听后，命中的 `.js`、`.wasm` 等资源会实时显示在这里。
+              暂无资源
             </div>
           )}
         </CardContent>
