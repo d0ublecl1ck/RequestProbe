@@ -57,6 +57,14 @@
   html,
   body {
     height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  #app {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -83,6 +91,7 @@
     linear-gradient(120deg, #fbf6ef 0%, #f3f1e9 40%, #f5f0e8 100%);
   position: relative;
   overflow: hidden;
+  overscroll-behavior-y: none;
 }
 
 .app-shell::before {
@@ -132,6 +141,14 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 250, 245, 0.74)),
     radial-gradient(circle at top left, rgba(251, 191, 36, 0.12), transparent 36%);
+}
+
+@media (max-width: 1279px) {
+  .workspace-sidebar {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 250, 245, 0.8)),
+      radial-gradient(circle at top left, rgba(251, 191, 36, 0.1), transparent 36%);
+  }
 }
 
 .workspace-nav-item {

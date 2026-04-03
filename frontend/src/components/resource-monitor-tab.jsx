@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Code2,
-  ChevronDown,
   FolderOpen,
   Loader2,
   PauseCircle,
@@ -9,7 +8,6 @@ import {
   Power,
   RefreshCcw,
   Download,
-  ExternalLink,
   Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,6 +24,7 @@ import { Checkbox } from './ui/checkbox.jsx';
 import { Input } from './ui/input.jsx';
 import { ScrollArea } from './ui/scroll-area.jsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table.jsx';
+import { OpenerSelect } from './resource-monitor/opener-select.jsx';
 import { EventsOn } from '../../wailsjs/runtime/runtime.js';
 import {
   DownloadSelectedResources,
@@ -96,13 +95,10 @@ export function ResourceMonitorTab() {
   const [isOpeningFinder, setIsOpeningFinder] = useState(false);
   const [isOpeningVSCode, setIsOpeningVSCode] = useState(false);
   const [selectedOpener, setSelectedOpener] = useState('finder');
-  const [isOpenerMenuOpen, setIsOpenerMenuOpen] = useState(false);
 
   const resources = task?.resources || [];
   const taskStatus = task?.status || 'idle';
   const statusInfo = statusMeta[taskStatus] || statusMeta.idle;
-  const currentOpener = OPENERS.find((item) => item.value === selectedOpener) || OPENERS[0];
-  const CurrentOpenerIcon = currentOpener.icon;
   const activeSelectionIds = useMemo(
     () => Object.entries(selectedIds).filter(([, checked]) => checked).map(([id]) => id),
     [selectedIds],
@@ -163,22 +159,6 @@ export function ResourceMonitorTab() {
       unsubscribe?.();
     };
   }, []);
-
-  useEffect(() => {
-    if (!isOpenerMenuOpen) {
-      return undefined;
-    }
-
-    const handlePointerDown = (event) => {
-      const menuRoot = document.querySelector('[data-opener-select-root="true"]');
-      if (menuRoot && !menuRoot.contains(event.target)) {
-        setIsOpenerMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('pointerdown', handlePointerDown);
-    return () => window.removeEventListener('pointerdown', handlePointerDown);
-  }, [isOpenerMenuOpen]);
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -288,8 +268,8 @@ export function ResourceMonitorTab() {
   };
 
   return (
-    <div className="grid min-w-0 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-      <div className="flex min-w-0 flex-col gap-6">
+    <div className="grid h-full min-h-0 min-w-0 gap-4 overflow-y-auto xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] xl:gap-6 xl:overflow-hidden">
+      <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:gap-6 xl:overflow-y-auto xl:pr-1">
         <Card className="glass-panel overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -397,71 +377,22 @@ export function ResourceMonitorTab() {
               </Button>
             </div>
 
-            <div className="relative" data-opener-select-root="true">
-              <div className="opener-select-shell">
-                <button
-                  type="button"
-                  className="opener-select-main"
-                  onClick={() => openDir(currentOpener.value)}
-                  disabled={!task?.downloadDir || isOpeningFinder || isOpeningVSCode}
-                >
-                  <span className="opener-select-icon">
-                    {(currentOpener.value === 'finder' && isOpeningFinder) || (currentOpener.value === 'vscode' && isOpeningVSCode) ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CurrentOpenerIcon className="h-4 w-4" />
-                    )}
-                  </span>
-                  <span className="opener-select-label">{currentOpener.label}</span>
-                </button>
-                <button
-                  type="button"
-                  className="opener-select-toggle"
-                  onClick={() => setIsOpenerMenuOpen((prev) => !prev)}
-                  disabled={!task?.downloadDir}
-                  aria-haspopup="menu"
-                  aria-expanded={isOpenerMenuOpen}
-                  aria-label="选择打开方式"
-                >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${isOpenerMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-
-              {isOpenerMenuOpen && (
-                <div className="opener-select-menu" role="menu">
-                  {OPENERS.map((opener) => {
-                    const OpenerIcon = opener.icon;
-                    const isActive = opener.value === currentOpener.value;
-                    return (
-                      <button
-                        key={opener.value}
-                        type="button"
-                        role="menuitem"
-                        className={`opener-select-option ${isActive ? 'opener-select-option-active' : ''}`}
-                        onClick={() => {
-                          setSelectedOpener(opener.value);
-                          setIsOpenerMenuOpen(false);
-                        }}
-                      >
-                        <span className="opener-select-option-icon">
-                          <OpenerIcon className="h-4 w-4" />
-                        </span>
-                        <span className="opener-select-option-text">
-                          <span className="opener-select-option-title">{opener.label}</span>
-                          <span className="opener-select-option-subtitle">{opener.subtitle}</span>
-                        </span>
-                        {isActive && <ExternalLink className="opener-select-option-mark" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <OpenerSelect
+              options={OPENERS}
+              selectedValue={selectedOpener}
+              onSelect={setSelectedOpener}
+              onOpen={openDir}
+              disabled={!task?.downloadDir}
+              loadingValues={{
+                finder: isOpeningFinder,
+                vscode: isOpeningVSCode,
+              }}
+            />
           </CardContent>
         </Card>
       </div>
 
-      <Card className="glass-panel min-w-0 overflow-hidden">
+      <Card className="glass-panel flex min-h-[420px] min-w-0 flex-col overflow-hidden xl:min-h-0">
         <CardHeader className="flex flex-col gap-3 border-b border-border/60 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle>命中资源列表</CardTitle>
@@ -478,9 +409,9 @@ export function ResourceMonitorTab() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="min-w-0 p-0">
+        <CardContent className="min-h-0 min-w-0 flex-1 p-0">
           {resources.length > 0 ? (
-            <ScrollArea className="h-[calc(100vh-320px)]">
+            <ScrollArea className="min-h-0 flex-1">
               <div className="p-4">
                 <div className="mb-3 flex items-center justify-between rounded-xl border border-border/60 bg-white/70 px-4 py-3">
                   <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
@@ -559,7 +490,7 @@ export function ResourceMonitorTab() {
               </div>
             </ScrollArea>
           ) : (
-            <div className="flex h-[calc(100vh-320px)] items-center justify-center px-8 text-center text-sm text-muted-foreground">
+            <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-sm text-muted-foreground">
               暂无资源
             </div>
           )}
