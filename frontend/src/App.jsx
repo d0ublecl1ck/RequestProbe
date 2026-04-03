@@ -15,7 +15,6 @@ import { Button } from './components/ui/button.jsx';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -85,6 +84,17 @@ const badgeVariantByStatus = (statusCode) => {
   if (statusCode >= 400) return 'destructive';
   return 'info';
 };
+
+const workspaceItems = [
+  {
+    value: 'request-lab',
+    label: '字段探针',
+  },
+  {
+    value: 'resource-monitor',
+    label: '资源监听',
+  },
+];
 
 export default function App() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState('request-lab');
@@ -353,53 +363,57 @@ export default function App() {
     <TooltipProvider>
       <div className="app-shell">
         <Toaster richColors position="top-right" />
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-6 px-6 py-8">
-          <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">RequestProbe</p>
-              <h1 className="text-3xl font-semibold text-foreground">RequestProbe</h1>
-              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                请求资产整理、字段探测与资源监听工作台。
-              </p>
-            </div>
-            <div className="flex items-center">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="打开 GitHub"
-                    onClick={openGithub}
-                  >
-                    <Github className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>GitHub</TooltipContent>
-              </Tooltip>
-            </div>
-          </header>
-          <Tabs value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab} className="flex flex-1 flex-col gap-6">
-            <TabsList className="workspace-tabs max-w-full">
-              <TabsTrigger value="request-lab">字段探针</TabsTrigger>
-              <TabsTrigger value="resource-monitor">资源监听</TabsTrigger>
-            </TabsList>
+        <div className="relative z-10 mx-auto flex h-screen w-full max-w-[1440px] overflow-hidden px-6 py-8">
+          <Tabs value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab} className="flex h-full w-full items-stretch gap-6 overflow-hidden">
+            <aside className="workspace-sidebar glass-panel flex h-full w-[272px] shrink-0 flex-col rounded-[28px] p-4">
+              <div className="flex items-center justify-between border-b border-border/50 px-3 pb-4 pt-2">
+                <p className="text-[13px] font-medium uppercase tracking-[0.24em] text-slate-700">RequestProbe</p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="打开 GitHub"
+                      onClick={openGithub}
+                    >
+                      <Github className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>GitHub</TooltipContent>
+                </Tooltip>
+              </div>
 
-            <TabsContent value="request-lab" className="mt-0">
+              <div className="mt-4 flex flex-col gap-2">
+                {workspaceItems.map((item) => {
+                  const isActive = item.value === activeWorkspaceTab;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setActiveWorkspaceTab(item.value)}
+                      className={`workspace-nav-item ${isActive ? 'workspace-nav-item-active' : ''}`}
+                    >
+                      <span className="workspace-nav-item-label">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+
+            <div className="min-w-0 flex-1 overflow-hidden">
+
+            <TabsContent value="request-lab" className="mt-0 h-full overflow-hidden">
               <div className="mb-6">
                 <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">字段探针</p>
                 <h2 className="mt-2 text-2xl font-semibold text-foreground">请求分析</h2>
-                <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                  将原始请求转成结构化测试资产，快速定位必需字段并生成可复用的 Python 代码片段。
-                </p>
               </div>
               <div className="grid min-w-0 flex-1 gap-6 lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
-            <Card className="glass-panel flex min-w-0 h-[calc(100vh-240px)] flex-col overflow-hidden">
+            <Card className="glass-panel flex min-w-0 h-[calc(100vh-120px)] flex-col overflow-hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ScanSearch className="h-5 w-5 text-muted-foreground" />
                   请求输入
                 </CardTitle>
-                <CardDescription>支持 Raw HTTP 与 curl 命令，自动识别请求格式。</CardDescription>
               </CardHeader>
               <ScrollArea className="flex-1">
                 <CardContent className="flex flex-col gap-6">
@@ -468,7 +482,6 @@ export default function App() {
                       <div className="space-y-4">
                         <div>
                           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">验证配置</p>
-                          <p className="text-sm text-muted-foreground">配置校验策略、匹配模式与超时参数。</p>
                         </div>
 
                         <div className="space-y-3">
@@ -653,13 +666,12 @@ export default function App() {
               )}
             </Card>
 
-            <ScrollArea className="min-w-0 h-[calc(100vh-240px)] rounded-xl">
+            <ScrollArea className="min-w-0 h-[calc(100vh-120px)] rounded-xl">
               <div className="flex min-w-0 flex-col gap-6 pr-2">
                 <Card className="glass-panel min-w-0 fade-in-up">
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
                       <CardTitle className="section-title">Python 代码</CardTitle>
-                      <CardDescription>生成可执行的请求脚本，支持快速复用。</CardDescription>
                     </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -691,7 +703,6 @@ export default function App() {
                 <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '80ms' }}>
                   <CardHeader>
                     <CardTitle className="section-title">请求测试结果</CardTitle>
-                    <CardDescription>单次请求测试结果与响应细节。</CardDescription>
                   </CardHeader>
                   <CardContent className="min-w-0 space-y-4">
                     {singleTestResult ? (
@@ -800,7 +811,6 @@ export default function App() {
                 <Card className="glass-panel min-w-0 fade-in-up" style={{ animationDelay: '160ms' }}>
                   <CardHeader>
                     <CardTitle className="section-title">测试摘要</CardTitle>
-                    <CardDescription>字段必要性与整体通过率。</CardDescription>
                   </CardHeader>
                   <CardContent className="min-w-0 space-y-4">
                       {testResult ? (
@@ -908,7 +918,6 @@ export default function App() {
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
                       <CardTitle className="section-title">简化代码</CardTitle>
-                      <CardDescription>字段必要性分析后生成的精简版本。</CardDescription>
                     </div>
                     <Button
                       variant="outline"
@@ -936,9 +945,10 @@ export default function App() {
           </div>
             </TabsContent>
 
-            <TabsContent value="resource-monitor" className="mt-0">
+            <TabsContent value="resource-monitor" className="mt-0 h-full overflow-hidden">
               <ResourceMonitorTab />
             </TabsContent>
+            </div>
           </Tabs>
         </div>
       </div>
