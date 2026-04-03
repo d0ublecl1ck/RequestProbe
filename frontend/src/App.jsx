@@ -367,7 +367,7 @@ export default function App() {
     <TooltipProvider>
       <div className="app-shell">
         <Toaster richColors position="top-right" />
-        <div className="relative z-10 mx-auto flex h-screen w-full max-w-[1440px] overflow-hidden px-6 py-8">
+        <div className="relative z-10 mx-auto flex h-screen w-[min(90vw,1800px)] max-w-none overflow-hidden py-8">
           <Tabs value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab} className="flex h-full w-full items-stretch gap-6 overflow-hidden">
             <aside className="workspace-sidebar glass-panel flex h-full w-[272px] shrink-0 flex-col rounded-[28px] p-4">
               <div className="flex items-center justify-between border-b border-border/50 px-3 pb-4 pt-2">
