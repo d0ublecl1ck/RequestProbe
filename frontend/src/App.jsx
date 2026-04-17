@@ -6,6 +6,7 @@ import { MainContainer } from './components/layout/main-container.jsx';
 import { WorkspaceSidebar } from './components/layout/workspace-sidebar.jsx';
 import { RequestLabWorkspace } from './components/request-lab/request-lab-workspace.jsx';
 import { ResourceMonitorTab } from './components/resource-monitor-tab.jsx';
+import { SettingsTab } from './components/settings-tab.jsx';
 import { TooltipProvider } from './components/ui/tooltip.jsx';
 import { Tabs, TabsContent } from './components/ui/tabs.jsx';
 import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
@@ -20,6 +21,10 @@ const workspaceItems = [
   {
     value: 'resource-monitor',
     label: '资源监听',
+  },
+  {
+    value: 'settings',
+    label: '设置',
   },
 ];
 
@@ -61,6 +66,10 @@ export default function App() {
 
               <TabsContent value="resource-monitor" className="mt-0 h-full overflow-hidden">
                 <ResourceMonitorTab />
+              </TabsContent>
+
+              <TabsContent value="settings" className="mt-0 h-full overflow-hidden">
+                <SettingsTab />
               </TabsContent>
             </MainContainer>
           </Tabs>

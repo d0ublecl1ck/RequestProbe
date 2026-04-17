@@ -22,6 +22,7 @@ type ResourceMonitorTask struct {
 	UpdatedAt          string                `json:"updatedAt"`
 	LastError          string                `json:"lastError,omitempty"`
 	Resources          []*MonitoredResource  `json:"resources"`
+	Requests           []*MonitoredRequest   `json:"requests"`
 }
 
 // MonitoredResource 表示监听到的资源
@@ -40,6 +41,23 @@ type MonitoredResource struct {
 	LastSeenAt        string `json:"lastSeenAt"`
 }
 
+// MonitoredRequest 表示监听页面过程中捕获到的请求
+type MonitoredRequest struct {
+	ID                  string            `json:"id"`
+	URL                 string            `json:"url"`
+	Method              string            `json:"method"`
+	ResourceType        string            `json:"resourceType,omitempty"`
+	MimeType            string            `json:"mimeType,omitempty"`
+	StatusCode          int               `json:"statusCode"`
+	Failed              bool              `json:"failed"`
+	FailureText         string            `json:"failureText,omitempty"`
+	RequestHeaders      map[string]string `json:"requestHeaders,omitempty"`
+	ResponseHeaders     map[string]string `json:"responseHeaders,omitempty"`
+	RequestBodyPreview  string            `json:"requestBodyPreview,omitempty"`
+	ResponseBodyPreview string            `json:"responseBodyPreview,omitempty"`
+	FirstSeenAt         string            `json:"firstSeenAt"`
+}
+
 // DownloadResourcesResult 表示批量下载结果
 type DownloadResourcesResult struct {
 	TaskID            string               `json:"taskId"`
@@ -55,5 +73,6 @@ type ResourceMonitorEvent struct {
 	Message  string                   `json:"message,omitempty"`
 	Task     *ResourceMonitorTask     `json:"task,omitempty"`
 	Resource *MonitoredResource       `json:"resource,omitempty"`
+	Request  *MonitoredRequest        `json:"request,omitempty"`
 	Download *DownloadResourcesResult `json:"download,omitempty"`
 }

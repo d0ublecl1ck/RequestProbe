@@ -64,6 +64,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
       - name: Install Linux GUI deps
         if: runner.os == 'Linux'
         shell: bash
@@ -82,11 +86,35 @@ jobs:
             "$webkit_pkg" \
             libayatana-appindicator3-dev
 
+      - name: Sync resource monitor Python env (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          UV_PROJECT_ENVIRONMENT=.venv-monitor uv sync --python 3.13 --no-dev
+
+      - name: Sync resource monitor Python env (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:UV_PROJECT_ENVIRONMENT = ".venv-monitor"
+          uv sync --python 3.13 --no-dev
+
       - name: Install Wails CLI
         shell: bash
         run: |
           set -euo pipefail
           go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Prepare installer runtime staging (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $runtimeDir = "build/windows/installer/runtime/python"
+          if (Test-Path $runtimeDir) {
+            Remove-Item $runtimeDir -Recurse -Force
+          }
+          .\.venv-monitor\Scripts\python.exe scripts\prepare_python_runtime.py --dest $runtimeDir
 
       - name: Build app (macOS)
         if: runner.os == 'macOS'
@@ -108,6 +136,39 @@ jobs:
         run: |
           set -euo pipefail
           wails build -clean
+
+      - name: Bundle Python runtime (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$(find build/bin -maxdepth 1 -type d -name '*.app' -print -quit)"
+          if [ -z "$app_path" ]; then
+            echo "No macOS app bundle produced under build/bin" >&2
+            exit 1
+          fi
+          .venv-monitor/bin/python scripts/prepare_python_runtime.py --dest "$app_path/Contents/Resources/python"
+
+      - name: Bundle Python runtime (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv-monitor/bin/python scripts/prepare_python_runtime.py --dest build/bin/python
+
+      - name: Copy Python runtime beside Windows portable build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stagedRuntime = "build/windows/installer/runtime/python"
+          $portableRuntime = "build/bin/python"
+          if (-not (Test-Path $stagedRuntime)) {
+            throw "Missing staged Windows runtime at $stagedRuntime"
+          }
+          if (Test-Path $portableRuntime) {
+            Remove-Item $portableRuntime -Recurse -Force
+          }
+          Copy-Item $stagedRuntime $portableRuntime -Recurse
 
       - name: Package artifact (macOS)
         if: runner.os == 'macOS'

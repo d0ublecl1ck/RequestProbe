@@ -27,6 +27,9 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Env / OS
+.venv/
+.venv-monitor/
+__pycache__/
 .env
 .env.*
 .DS_Store

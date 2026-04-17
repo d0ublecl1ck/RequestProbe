@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -199,21 +200,7 @@ func (w *pythonWorker) request(ctx context.Context, cmdType string, payload inte
 }
 
 func resolvePythonExecutable(ctx context.Context) (string, error) {
-	candidates := []string{}
-	if envPath := strings.TrimSpace(os.Getenv("REQUESTPROBE_PYTHON")); envPath != "" {
-		candidates = append(candidates, envPath)
-	}
-
-	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates,
-			filepath.Join(cwd, ".venv-monitor", "bin", "python3"),
-			filepath.Join(cwd, ".venv-monitor", "bin", "python"),
-			filepath.Join(cwd, ".venv", "bin", "python3"),
-			filepath.Join(cwd, ".venv", "bin", "python"),
-		)
-	}
-
-	candidates = append(candidates, "python3", "python")
+	candidates := pythonExecutableCandidates()
 
 	for _, candidate := range candidates {
 		if strings.TrimSpace(candidate) == "" {
@@ -241,6 +228,101 @@ func resolvePythonExecutable(ctx context.Context) (string, error) {
 	}
 
 	return "", errors.New("未找到可用的 Python + DrissionPage 运行环境，请先安装 DrissionPage，或设置 REQUESTPROBE_PYTHON 指向可用解释器")
+}
+
+func pythonExecutableCandidates() []string {
+	candidates := []string{}
+	if envPath := strings.TrimSpace(os.Getenv("REQUESTPROBE_PYTHON")); envPath != "" {
+		candidates = append(candidates, envPath)
+	}
+
+	if execPath, err := os.Executable(); err == nil {
+		candidates = append(candidates, bundledPythonExecutableCandidates(execPath)...)
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, developmentPythonExecutableCandidates(cwd)...)
+	}
+
+	candidates = append(candidates, "python3", "python")
+	return uniqueNonEmptyStrings(candidates)
+}
+
+func bundledPythonExecutableCandidates(execPath string) []string {
+	if strings.TrimSpace(execPath) == "" {
+		return nil
+	}
+
+	switch runtime.GOOS {
+	case "darwin":
+		baseDir := filepath.Join(filepath.Dir(execPath), "..", "Resources", "python")
+		return []string{
+			filepath.Join(baseDir, "bin", "python3"),
+			filepath.Join(baseDir, "bin", "python"),
+			filepath.Join(baseDir, "bin", "python3.13"),
+		}
+	case "windows":
+		baseDir := filepath.Join(filepath.Dir(execPath), "python")
+		return []string{
+			filepath.Join(baseDir, "python.exe"),
+			filepath.Join(baseDir, "python3.exe"),
+		}
+	default:
+		baseDir := filepath.Join(filepath.Dir(execPath), "python")
+		return []string{
+			filepath.Join(baseDir, "bin", "python3"),
+			filepath.Join(baseDir, "bin", "python"),
+			filepath.Join(baseDir, "python3"),
+			filepath.Join(baseDir, "python"),
+		}
+	}
+}
+
+func developmentPythonExecutableCandidates(cwd string) []string {
+	if strings.TrimSpace(cwd) == "" {
+		return nil
+	}
+
+	envDirs := []string{
+		filepath.Join(cwd, ".venv-monitor"),
+		filepath.Join(cwd, ".venv"),
+	}
+
+	candidates := []string{}
+	for _, envDir := range envDirs {
+		candidates = append(candidates, venvExecutableCandidates(envDir)...)
+	}
+	return candidates
+}
+
+func venvExecutableCandidates(envDir string) []string {
+	if strings.TrimSpace(envDir) == "" {
+		return nil
+	}
+
+	return []string{
+		filepath.Join(envDir, "bin", "python3"),
+		filepath.Join(envDir, "bin", "python"),
+		filepath.Join(envDir, "Scripts", "python.exe"),
+		filepath.Join(envDir, "Scripts", "python3.exe"),
+	}
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func ensurePythonWorkerScript() (string, error) {
@@ -272,12 +354,14 @@ func ensurePythonWorkerScript() (string, error) {
 
 // ResourceMonitorService 提供资源监听能力
 type ResourceMonitorService struct {
-	mu            sync.RWMutex
-	ctx           context.Context
-	worker        resourceMonitorWorker
-	workerFactory func(context.Context, func(pythonMessage)) (resourceMonitorWorker, error)
-	task          *models.ResourceMonitorTask
-	eventFn       func(*models.ResourceMonitorEvent)
+	mu             sync.RWMutex
+	ctx            context.Context
+	worker         resourceMonitorWorker
+	workerFactory  func(context.Context, func(pythonMessage)) (resourceMonitorWorker, error)
+	settingsPathFn func() (string, error)
+	defaultRootFn  func() (string, error)
+	task           *models.ResourceMonitorTask
+	eventFn        func(*models.ResourceMonitorEvent)
 }
 
 // NewResourceMonitorService 创建资源监听服务
@@ -286,6 +370,8 @@ func NewResourceMonitorService() *ResourceMonitorService {
 		workerFactory: func(ctx context.Context, eventFn func(pythonMessage)) (resourceMonitorWorker, error) {
 			return newPythonWorker(ctx, eventFn)
 		},
+		settingsPathFn: defaultResourceMonitorSettingsPath,
+		defaultRootFn:  defaultResourceMonitorSaveRootDir,
 	}
 }
 
@@ -327,6 +413,11 @@ func (s *ResourceMonitorService) StartTask(ctx context.Context, rawURL string, e
 		return nil, errors.New("至少选择一个文件后缀")
 	}
 
+	saveRootDir, err := s.getEffectiveSaveRootDir()
+	if err != nil {
+		return nil, err
+	}
+
 	s.mu.Lock()
 	if s.task != nil && (s.task.Status == models.ResourceMonitorStatusRunning || s.task.Status == models.ResourceMonitorStatusPaused) {
 		s.mu.Unlock()
@@ -345,7 +436,7 @@ func (s *ResourceMonitorService) StartTask(ctx context.Context, rawURL string, e
 	s.mu.Unlock()
 
 	taskID := uuid.NewString()
-	downloadDir, err := prepareDownloadDir(taskID)
+	downloadDir, err := prepareDownloadDir(saveRootDir, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -530,6 +621,7 @@ func (s *ResourceMonitorService) handleWorkerEvent(msg pythonMessage) {
 		if err := json.Unmarshal(msg.Payload, &task); err == nil {
 			s.task = &task
 			s.sortResourcesLocked()
+			s.sortRequestsLocked()
 			s.emitLocked(&models.ResourceMonitorEvent{
 				Type: msg.Type,
 				Task: cloneTask(s.task),
@@ -565,6 +657,37 @@ func (s *ResourceMonitorService) handleWorkerEvent(msg pythonMessage) {
 			Type:     "resource_detected",
 			Task:     cloneTask(s.task),
 			Resource: cloneResource(payload.Resource),
+		})
+	case "request_detected":
+		var payload struct {
+			Task    *models.ResourceMonitorTask `json:"task"`
+			Request *models.MonitoredRequest    `json:"request"`
+		}
+		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			return
+		}
+		if payload.Task != nil {
+			s.task = payload.Task
+		}
+		if s.task != nil && payload.Request != nil {
+			replaced := false
+			for i, item := range s.task.Requests {
+				if item.ID == payload.Request.ID {
+					s.task.Requests[i] = payload.Request
+					replaced = true
+					break
+				}
+			}
+			if !replaced {
+				s.task.Requests = append(s.task.Requests, payload.Request)
+			}
+			s.task.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+			s.sortRequestsLocked()
+		}
+		s.emitLocked(&models.ResourceMonitorEvent{
+			Type:    "request_detected",
+			Task:    cloneTask(s.task),
+			Request: cloneRequest(payload.Request),
 		})
 	case "resources_downloaded":
 		var result models.DownloadResourcesResult
@@ -603,6 +726,15 @@ func (s *ResourceMonitorService) sortResourcesLocked() {
 	}
 	sort.SliceStable(s.task.Resources, func(i, j int) bool {
 		return s.task.Resources[i].FirstSeenAt > s.task.Resources[j].FirstSeenAt
+	})
+}
+
+func (s *ResourceMonitorService) sortRequestsLocked() {
+	if s.task == nil {
+		return
+	}
+	sort.SliceStable(s.task.Requests, func(i, j int) bool {
+		return s.task.Requests[i].FirstSeenAt > s.task.Requests[j].FirstSeenAt
 	})
 }
 
@@ -668,12 +800,12 @@ func normalizeResourceIDs(ids []string) []string {
 	return result
 }
 
-func prepareDownloadDir(taskID string) (string, error) {
-	configDir, err := os.UserConfigDir()
+func prepareDownloadDir(rootDir, taskID string) (string, error) {
+	normalizedRoot, err := normalizeSaveRootDir(rootDir)
 	if err != nil {
-		return "", fmt.Errorf("获取应用数据目录失败: %w", err)
+		return "", err
 	}
-	downloadDir := filepath.Join(configDir, "RequestProbe", "downloads", taskID)
+	downloadDir := filepath.Join(normalizedRoot, taskID)
 	if err := os.MkdirAll(downloadDir, 0o755); err != nil {
 		return "", fmt.Errorf("创建下载目录失败: %w", err)
 	}
@@ -690,6 +822,10 @@ func cloneTask(task *models.ResourceMonitorTask) *models.ResourceMonitorTask {
 	for _, item := range task.Resources {
 		cloned.Resources = append(cloned.Resources, cloneResource(item))
 	}
+	cloned.Requests = make([]*models.MonitoredRequest, 0, len(task.Requests))
+	for _, item := range task.Requests {
+		cloned.Requests = append(cloned.Requests, cloneRequest(item))
+	}
 	return &cloned
 }
 
@@ -698,6 +834,26 @@ func cloneResource(resource *models.MonitoredResource) *models.MonitoredResource
 		return nil
 	}
 	cloned := *resource
+	return &cloned
+}
+
+func cloneRequest(request *models.MonitoredRequest) *models.MonitoredRequest {
+	if request == nil {
+		return nil
+	}
+	cloned := *request
+	if request.RequestHeaders != nil {
+		cloned.RequestHeaders = make(map[string]string, len(request.RequestHeaders))
+		for key, value := range request.RequestHeaders {
+			cloned.RequestHeaders[key] = value
+		}
+	}
+	if request.ResponseHeaders != nil {
+		cloned.ResponseHeaders = make(map[string]string, len(request.ResponseHeaders))
+		for key, value := range request.ResponseHeaders {
+			cloned.ResponseHeaders[key] = value
+		}
+	}
 	return &cloned
 }
 

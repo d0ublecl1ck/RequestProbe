@@ -250,3 +250,33 @@ func (a *App) DownloadSelectedResources(resourceIDs []string) (*models.DownloadR
 func (a *App) OpenResourceMonitorDownloadDir(opener string) error {
 	return a.resourceMonitorService.OpenDownloadDir(a.ctx, opener)
 }
+
+// GetResourceMonitorSettings 获取资源监听设置
+func (a *App) GetResourceMonitorSettings() (*models.ResourceMonitorSettings, error) {
+	return a.resourceMonitorService.GetSettings(a.ctx)
+}
+
+// UpdateResourceMonitorSaveRoot 更新资源监听默认保存目录
+func (a *App) UpdateResourceMonitorSaveRoot(saveRoot string) (*models.ResourceMonitorSettings, error) {
+	return a.resourceMonitorService.UpdateSaveRoot(a.ctx, saveRoot)
+}
+
+// ResetResourceMonitorSaveRoot 重置资源监听默认保存目录
+func (a *App) ResetResourceMonitorSaveRoot() (*models.ResourceMonitorSettings, error) {
+	return a.resourceMonitorService.ResetSaveRoot(a.ctx)
+}
+
+// ChooseResourceMonitorSaveRoot 打开系统目录选择器
+func (a *App) ChooseResourceMonitorSaveRoot() (string, error) {
+	settings, err := a.resourceMonitorService.GetSettings(a.ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:                "选择资源监听页面保存目录",
+		DefaultDirectory:     settings.SaveRootDir,
+		CanCreateDirectories: true,
+		ShowHiddenFiles:      true,
+	})
+}

@@ -1,1 +1,2 @@
+# Compatibility mirror. The canonical dependency source is pyproject.toml + uv.lock.
 DrissionPage>=4.1,<5

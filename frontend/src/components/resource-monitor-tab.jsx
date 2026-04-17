@@ -24,9 +24,11 @@ import { Checkbox } from './ui/checkbox.jsx';
 import { Input } from './ui/input.jsx';
 import { ScrollArea } from './ui/scroll-area.jsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table.jsx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
 import { OpenerSelect } from './resource-monitor/opener-select.jsx';
 import { EventsOn } from '../../wailsjs/runtime/runtime.js';
 import {
+  GetResourceMonitorSettings,
   DownloadSelectedResources,
   EndResourceMonitor,
   GetCommonResourceExtensions,
@@ -95,8 +97,11 @@ export function ResourceMonitorTab() {
   const [isOpeningFinder, setIsOpeningFinder] = useState(false);
   const [isOpeningVSCode, setIsOpeningVSCode] = useState(false);
   const [selectedOpener, setSelectedOpener] = useState('finder');
+  const [saveRootDir, setSaveRootDir] = useState('');
+  const [activeView, setActiveView] = useState('resources');
 
   const resources = task?.resources || [];
+  const requests = task?.requests || [];
   const taskStatus = task?.status || 'idle';
   const statusInfo = statusMeta[taskStatus] || statusMeta.idle;
   const activeSelectionIds = useMemo(
@@ -111,15 +116,17 @@ export function ResourceMonitorTab() {
 
     const loadInitialState = async () => {
       try {
-        const [extensions, currentTask] = await Promise.all([
+        const [extensions, currentTask, settings] = await Promise.all([
           GetCommonResourceExtensions(),
           GetResourceMonitorTask(),
+          GetResourceMonitorSettings(),
         ]);
 
         if (!mounted) return;
 
         const nextExtensions = extensions?.length ? extensions : DEFAULT_EXTENSIONS;
         setAvailableExtensions(nextExtensions);
+        setSaveRootDir(settings?.saveRootDir || '');
 
         if (currentTask) {
           setTask(currentTask);
@@ -334,12 +341,25 @@ export function ResourceMonitorTab() {
                 <p className="monitor-label">已命中资源</p>
                 <p className="monitor-mono">{resources.length}</p>
               </div>
+              <div className="monitor-metric sm:col-span-2">
+                <p className="monitor-label">已监听请求</p>
+                <p className="monitor-mono">{requests.length}</p>
+              </div>
             </div>
 
             <div className="monitor-metric">
               <p className="monitor-label">下载目录</p>
               <p className="break-all text-sm text-slate-200/88">{task?.downloadDir || '--'}</p>
             </div>
+
+            {!task?.downloadDir && saveRootDir && (
+              <div className="monitor-metric">
+                <p className="monitor-label">默认保存根目录</p>
+                <p className="break-all text-sm text-slate-200/88 [overflow-wrap:anywhere]">
+                  {saveRootDir}
+                </p>
+              </div>
+            )}
 
             {task?.lastError && (
               <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -393,108 +413,195 @@ export function ResourceMonitorTab() {
       </div>
 
       <Card className="glass-panel flex min-h-[420px] min-w-0 flex-col overflow-hidden xl:min-h-0">
-        <CardHeader className="flex flex-col gap-3 border-b border-border/60 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <CardTitle>命中资源列表</CardTitle>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={downloadSelected}
-              disabled={isDownloading || activeSelectionIds.length === 0}
-            >
-              {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              下载选中项
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="min-h-0 min-w-0 flex-1 p-0">
-          {resources.length > 0 ? (
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="p-4">
-                <div className="mb-3 flex items-center justify-between rounded-xl border border-border/60 bg-white/70 px-4 py-3">
-                  <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
-                    <Checkbox
-                      checked={allChecked}
-                      onCheckedChange={(checked) => toggleAll(Boolean(checked))}
-                    />
-                    <span>{allChecked ? '已全选' : someChecked ? '部分已选' : '全选资源'}</span>
-                  </label>
-                  <Badge variant="info">{activeSelectionIds.length} / {resources.length} 已选</Badge>
-                </div>
-
-                <div className="rounded-xl border border-border/60 bg-white/70">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[68px]">选择</TableHead>
-                        <TableHead className="w-[110px]">类型</TableHead>
-                        <TableHead>资源地址</TableHead>
-                        <TableHead className="w-[120px]">大小</TableHead>
-                        <TableHead className="w-[140px]">状态</TableHead>
-                        <TableHead className="w-[190px]">文件名</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {resources.map((resource) => (
-                        <TableRow key={resource.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={Boolean(selectedIds[resource.id])}
-                              onCheckedChange={(checked) =>
-                                setSelectedIds((prev) => ({
-                                  ...prev,
-                                  [resource.id]: Boolean(checked),
-                                }))
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="font-mono">.{resource.extension}</Badge>
-                              {resource.downloaded && <Badge variant="success">已下载</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="align-top">
-                            <div className="space-y-1">
-                              <p className="break-all text-sm font-medium text-slate-800 [overflow-wrap:anywhere]">{resource.url}</p>
-                              <p className="monitor-mono text-[11px] text-slate-500">Hash {resource.hash.slice(0, 12)}</p>
-                              <p className="text-xs text-muted-foreground">首次命中 {formatTime(resource.firstSeenAt)}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium text-slate-700">{formatBytes(resource.size)}</TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <Badge variant={resource.statusCode >= 400 ? 'destructive' : 'secondary'}>
-                                {resource.statusCode || '--'}
-                              </Badge>
-                              {resource.mimeType && (
-                                <p className="break-all text-xs text-muted-foreground [overflow-wrap:anywhere]">{resource.mimeType}</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="align-top">
-                            <div className="space-y-1">
-                              <p className="break-all text-sm font-medium text-slate-700 [overflow-wrap:anywhere]">{resource.suggestedFileName}</p>
-                              {resource.downloadedPath && (
-                                <p className="break-all text-xs text-muted-foreground [overflow-wrap:anywhere]">{resource.downloadedPath}</p>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-sm text-muted-foreground">
-              暂无资源
+        <Tabs
+          value={activeView}
+          onValueChange={setActiveView}
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        >
+          <CardHeader className="flex flex-col gap-3 border-b border-border/60 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <CardTitle>{activeView === 'resources' ? '命中资源列表' : '请求监听列表'}</CardTitle>
+              <TabsList className="bg-white/65">
+                <TabsTrigger value="resources">资源</TabsTrigger>
+                <TabsTrigger value="requests">请求</TabsTrigger>
+              </TabsList>
             </div>
-          )}
-        </CardContent>
+            <div className="flex flex-wrap items-center gap-2">
+              {activeView === 'resources' && (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={downloadSelected}
+                  disabled={isDownloading || activeSelectionIds.length === 0}
+                >
+                  {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  下载选中项
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+
+          <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0">
+            <TabsContent value="resources" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              {resources.length > 0 ? (
+                <ScrollArea className="min-h-0 flex-1">
+                  <div className="p-4">
+                    <div className="mb-3 flex items-center justify-between rounded-xl border border-border/60 bg-white/70 px-4 py-3">
+                      <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+                        <Checkbox
+                          checked={allChecked}
+                          onCheckedChange={(checked) => toggleAll(Boolean(checked))}
+                        />
+                        <span>{allChecked ? '已全选' : someChecked ? '部分已选' : '全选资源'}</span>
+                      </label>
+                      <Badge variant="info">{activeSelectionIds.length} / {resources.length} 已选</Badge>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-border/60 bg-white/70">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[68px]">选择</TableHead>
+                            <TableHead className="w-[110px]">类型</TableHead>
+                            <TableHead>资源地址</TableHead>
+                            <TableHead className="w-[120px]">大小</TableHead>
+                            <TableHead className="w-[140px]">状态</TableHead>
+                            <TableHead className="w-[190px]">文件名</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {resources.map((resource) => (
+                            <TableRow key={resource.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={Boolean(selectedIds[resource.id])}
+                                  onCheckedChange={(checked) =>
+                                    setSelectedIds((prev) => ({
+                                      ...prev,
+                                      [resource.id]: Boolean(checked),
+                                    }))
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="font-mono">.{resource.extension}</Badge>
+                                  {resource.downloaded && <Badge variant="success">已下载</Badge>}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="space-y-1">
+                                  <p className="break-all text-sm font-medium text-slate-800 [overflow-wrap:anywhere]">{resource.url}</p>
+                                  <p className="monitor-mono text-[11px] text-slate-500">Hash {resource.hash.slice(0, 12)}</p>
+                                  <p className="text-xs text-muted-foreground">首次命中 {formatTime(resource.firstSeenAt)}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium text-slate-700">{formatBytes(resource.size)}</TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <Badge variant={resource.statusCode >= 400 ? 'destructive' : 'secondary'}>
+                                    {resource.statusCode || '--'}
+                                  </Badge>
+                                  {resource.mimeType && (
+                                    <p className="break-all text-xs text-muted-foreground [overflow-wrap:anywhere]">{resource.mimeType}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="space-y-1">
+                                  <p className="break-all text-sm font-medium text-slate-700 [overflow-wrap:anywhere]">{resource.suggestedFileName}</p>
+                                  {resource.downloadedPath && (
+                                    <p className="break-all text-xs text-muted-foreground [overflow-wrap:anywhere]">{resource.downloadedPath}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-sm text-muted-foreground">
+                  暂无资源
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="requests" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              {requests.length > 0 ? (
+                <ScrollArea className="min-h-0 flex-1">
+                  <div className="p-4">
+                    <div className="overflow-hidden rounded-xl border border-border/60 bg-white/70">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[96px]">方法</TableHead>
+                            <TableHead className="w-[148px]">状态</TableHead>
+                            <TableHead className="w-[120px]">类型</TableHead>
+                            <TableHead>请求地址</TableHead>
+                            <TableHead className="w-[260px]">摘要</TableHead>
+                            <TableHead className="w-[180px]">时间</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {requests.map((request) => (
+                            <TableRow key={request.id}>
+                              <TableCell>
+                                <Badge variant="outline" className="font-mono">{request.method || '--'}</Badge>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="space-y-1">
+                                  <Badge variant={request.failed || request.statusCode >= 400 ? 'destructive' : 'secondary'}>
+                                    {request.failed ? `失败 ${request.statusCode || ''}`.trim() : (request.statusCode || '--')}
+                                  </Badge>
+                                  {request.failureText && (
+                                    <p className="break-all text-xs text-red-500 [overflow-wrap:anywhere]">{request.failureText}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="space-y-1">
+                                  <Badge variant="outline">{request.resourceType || '--'}</Badge>
+                                  {request.mimeType && (
+                                    <p className="break-all text-xs text-muted-foreground [overflow-wrap:anywhere]">{request.mimeType}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <p className="break-all text-sm font-medium text-slate-800 [overflow-wrap:anywhere]">{request.url}</p>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="space-y-1 text-xs text-muted-foreground">
+                                  {request.requestBodyPreview ? (
+                                    <p className="break-all [overflow-wrap:anywhere]">请求: {request.requestBodyPreview}</p>
+                                  ) : (
+                                    <p>请求体为空</p>
+                                  )}
+                                  {request.responseBodyPreview && (
+                                    <p className="break-all [overflow-wrap:anywhere]">响应: {request.responseBodyPreview}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {formatTime(request.firstSeenAt)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-sm text-muted-foreground">
+                  暂无请求
+                </div>
+              )}
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
     </div>
   );

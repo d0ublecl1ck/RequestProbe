@@ -69,6 +69,38 @@ def normalize_extension(ext):
     return ext
 
 
+def normalize_headers(headers):
+    if not headers:
+        return {}
+
+    normalized = {}
+    try:
+        items = headers.items()
+    except Exception:
+        items = []
+
+    for key, value in items:
+        normalized[str(key)] = str(value)
+    return normalized
+
+
+def summarize_value(value, limit=240):
+    if value in (None, "", b""):
+        return ""
+
+    if isinstance(value, (bytes, bytearray)):
+        text = bytes(value).decode("utf-8", errors="replace")
+    elif isinstance(value, (dict, list, tuple)):
+        text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    else:
+        text = str(value)
+
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
 def infer_extension(url, mime_type):
     path = urlparse(url).path
     suffix = Path(path).suffix.lower().lstrip(".")
@@ -101,6 +133,7 @@ class ResourceMonitorWorker:
         self.current_task = None
         self.extensions = set()
         self.resources = {}
+        self.requests = []
 
     def start_listener_thread(self):
         if self.listener_thread and self.listener_thread.is_alive():
@@ -132,6 +165,7 @@ class ResourceMonitorWorker:
             return None
         payload = dict(self.current_task)
         payload["resources"] = [self.public_resource(item) for item in self.resources.values()]
+        payload["requests"] = [self.public_request(item) for item in self.requests]
         return payload
 
     def public_resource(self, item):
@@ -148,6 +182,23 @@ class ResourceMonitorWorker:
             "downloadedPath": item.get("downloadedPath", ""),
             "firstSeenAt": item["firstSeenAt"],
             "lastSeenAt": item["lastSeenAt"],
+        }
+
+    def public_request(self, item):
+        return {
+            "id": item["id"],
+            "url": item["url"],
+            "method": item["method"],
+            "resourceType": item.get("resourceType", ""),
+            "mimeType": item.get("mimeType", ""),
+            "statusCode": item.get("statusCode", 0),
+            "failed": item.get("failed", False),
+            "failureText": item.get("failureText", ""),
+            "requestHeaders": item.get("requestHeaders", {}),
+            "responseHeaders": item.get("responseHeaders", {}),
+            "requestBodyPreview": item.get("requestBodyPreview", ""),
+            "responseBodyPreview": item.get("responseBodyPreview", ""),
+            "firstSeenAt": item["firstSeenAt"],
         }
 
     def update_status(self, status, last_error=""):
@@ -179,6 +230,7 @@ class ResourceMonitorWorker:
             self.listener_stop.set()
             self.close_browser()
             self.resources = {}
+            self.requests = []
             self.extensions = extensions
             os.makedirs(download_dir, exist_ok=True)
             browser_workspace = os.path.join(download_dir, ".browser")
@@ -254,6 +306,17 @@ class ResourceMonitorWorker:
             return self.public_task()
 
     def handle_packet(self, packet):
+        request_item = self.build_request_item(packet)
+        if request_item:
+            with self.lock:
+                self.requests.insert(0, request_item)
+                if self.current_task:
+                    self.current_task["updatedAt"] = now_iso()
+            event("request_detected", {"task": self.public_task(), "request": self.public_request(request_item)})
+
+        if getattr(packet, "is_failed", False):
+            return
+
         response_obj = getattr(packet, "response", None)
         if response_obj is None:
             return
@@ -309,6 +372,72 @@ class ResourceMonitorWorker:
                 self.current_task["updatedAt"] = now_iso()
 
         event("resource_detected", {"task": self.public_task(), "resource": self.public_resource(item)})
+
+    def build_request_item(self, packet):
+        request_obj = getattr(packet, "request", None)
+        if request_obj is None:
+            return None
+
+        failed = bool(getattr(packet, "is_failed", False))
+        response_obj = None if failed else getattr(packet, "response", None)
+        fail_info = getattr(packet, "fail_info", None) if failed else None
+        method = getattr(packet, "method", "") or getattr(request_obj, "method", "") or ""
+        url = getattr(packet, "url", "") or getattr(request_obj, "url", "") or ""
+        resource_type = getattr(packet, "resourceType", "") or ""
+        try:
+            request_headers = normalize_headers(getattr(request_obj, "headers", None))
+        except Exception:
+            request_headers = {}
+        try:
+            response_headers = normalize_headers(getattr(response_obj, "headers", None)) if response_obj else {}
+        except Exception:
+            response_headers = {}
+        mime_type = response_headers.get("content-type", "")
+        status_code = 0
+        if response_obj is not None:
+            try:
+                status_code = getattr(response_obj, "status", 0) or 0
+            except Exception:
+                status_code = 0
+
+        failure_text = ""
+        if failed and fail_info is not None:
+            failure_text = (
+                getattr(fail_info, "errorText", None)
+                or getattr(fail_info, "blockedReason", None)
+                or getattr(fail_info, "corsErrorStatus", None)
+                or "请求失败"
+            )
+
+        first_seen_at = now_iso()
+        identity = json.dumps(
+            {
+                "url": url,
+                "method": method,
+                "resourceType": resource_type,
+                "firstSeenAt": first_seen_at,
+                "failed": failed,
+                "statusCode": status_code,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+        return {
+            "id": hashlib.sha256(identity.encode("utf-8")).hexdigest(),
+            "url": url,
+            "method": method,
+            "resourceType": resource_type,
+            "mimeType": mime_type,
+            "statusCode": status_code,
+            "failed": failed,
+            "failureText": summarize_value(failure_text, limit=160),
+            "requestHeaders": request_headers,
+            "responseHeaders": response_headers,
+            "requestBodyPreview": summarize_value(getattr(request_obj, "postData", None)),
+            "responseBodyPreview": summarize_value(getattr(response_obj, "body", None)) if response_obj else "",
+            "firstSeenAt": first_seen_at,
+        }
 
     def download_resources(self, payload):
         resource_ids = payload.get("resourceIds") or []

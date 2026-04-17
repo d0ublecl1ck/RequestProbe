@@ -17,6 +17,9 @@ trap cleanup EXIT
 
 cd "$PROJECT_ROOT"
 
+echo "==> Syncing resource monitor uv environment"
+UV_PROJECT_ENVIRONMENT=.venv-monitor uv sync --python 3.13 --no-dev
+
 echo "==> Building ${APP_NAME}.app"
 wails build -clean -platform darwin/universal
 
@@ -24,6 +27,9 @@ if [[ ! -d "$APP_PATH" ]]; then
   echo "Expected app bundle not found: $APP_PATH" >&2
   exit 1
 fi
+
+echo "==> Bundling Python runtime into app"
+.venv-monitor/bin/python scripts/prepare_python_runtime.py --dest "$APP_PATH/Contents/Resources/python"
 
 echo "==> Preparing DMG staging directory"
 cp -R "$APP_PATH" "$STAGING_DIR/"
