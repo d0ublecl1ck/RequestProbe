@@ -58,7 +58,7 @@ export function RequestLabInputPanel({
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
     >
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-6 p-6">
+        <div className="flex flex-col gap-4 p-4">
           <FormSection title="输入类型">
             <RadioGroup value={inputType} onValueChange={onInputTypeChange} className="grid grid-cols-3 gap-2">
               {INPUT_TYPE_OPTIONS.map((option) => (

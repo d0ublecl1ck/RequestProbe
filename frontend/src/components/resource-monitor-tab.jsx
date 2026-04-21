@@ -340,23 +340,6 @@ export function ResourceMonitorTab() {
 
   return (
     <div className="workspace-page">
-      <section className="workspace-hero">
-        <p className="workspace-kicker">资源监听</p>
-        <h1 className="workspace-hero-title">任务监听</h1>
-        <p className="workspace-hero-copy">
-          在同一个浏览器任务里同时追踪资源和请求，并管理启动、暂停、恢复、结束与下载动作。
-        </p>
-        <div className="workspace-hero-grid">
-          {heroMetrics.map((item) => (
-            <div key={item.label} className="workspace-hero-metric">
-              <p className="workspace-hero-metric-label">{item.label}</p>
-              <p className="workspace-hero-metric-value">{item.value}</p>
-              <p className="workspace-hero-metric-copy">{item.copy}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section className="workspace-section">
         <div className="workspace-section-header">
           <div>
@@ -368,7 +351,7 @@ export function ResourceMonitorTab() {
           <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
         </div>
 
-        <div className="editorial-grid editorial-grid-2 p-4 xl:p-5">
+        <div className="editorial-grid editorial-grid-2 p-3 xl:p-4">
           <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:gap-5 xl:overflow-y-auto xl:pr-1">
             <Card className="glass-panel overflow-hidden">
           <CardHeader>
@@ -512,12 +495,22 @@ export function ResourceMonitorTab() {
               className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
             >
               <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-center gap-3">
-                  <CardTitle>{activeView === 'resources' ? '命中资源列表' : '请求监听列表'}</CardTitle>
-                  <TabsList className="bg-[var(--paper-alt)]">
-                    <TabsTrigger value="resources">资源</TabsTrigger>
-                    <TabsTrigger value="requests">请求</TabsTrigger>
-                  </TabsList>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <CardTitle>{activeView === 'resources' ? '命中资源列表' : '请求监听列表'}</CardTitle>
+                    <TabsList className="bg-[var(--paper-alt)]">
+                      <TabsTrigger value="resources">资源</TabsTrigger>
+                      <TabsTrigger value="requests">请求</TabsTrigger>
+                    </TabsList>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {heroMetrics.map((item) => (
+                      <div key={item.label} className="metric-card">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{item.label}</p>
+                        <p className="mt-1 text-sm font-semibold text-foreground">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {activeView === 'resources' && (

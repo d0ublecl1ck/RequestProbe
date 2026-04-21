@@ -28,6 +28,7 @@ const workspaceItems = [
 
 export default function App() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState('request-lab');
+  const activeWorkspaceItem = workspaceItems.find((item) => item.value === activeWorkspaceTab) || workspaceItems[0];
 
   return (
     <TooltipProvider>
@@ -39,7 +40,13 @@ export default function App() {
             onValueChange={setActiveWorkspaceTab}
             className="workspace-shell"
           >
-            <WorkspaceSidebar items={workspaceItems} value={activeWorkspaceTab} onChange={setActiveWorkspaceTab} />
+            <WorkspaceSidebar
+              items={workspaceItems}
+              value={activeWorkspaceTab}
+              onChange={setActiveWorkspaceTab}
+              currentTitle={activeWorkspaceItem.label}
+              currentDescription={activeWorkspaceItem.subtitle}
+            />
 
             <div className="workspace-main min-h-0 min-w-0 flex-1 overflow-hidden">
               <TabsContent value="request-lab" className="mt-0 h-full overflow-hidden">

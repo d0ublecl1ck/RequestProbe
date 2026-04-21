@@ -4,8 +4,8 @@
   "outputfilename": "RequestProbe",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
-  "frontend:dev:watcher": "npm run dev",
-  "frontend:dev:serverUrl": "auto",
+  "frontend:dev:watcher": "npm run dev -- --host 127.0.0.1 --port 5173 --strictPort",
+  "frontend:dev:serverUrl": "http://127.0.0.1:5173",
   "author": {
     "name": "d0ublecl1ck",
     "email": "3213679647@qq.com"

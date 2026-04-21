@@ -318,23 +318,6 @@ export function RequestLabWorkspace() {
 
   return (
     <div className="workspace-page">
-      <section className="workspace-hero">
-        <p className="workspace-kicker">字段探针</p>
-        <h1 className="workspace-hero-title">请求分析</h1>
-        <p className="workspace-hero-copy">
-          粘贴原始请求后，依次完成解析、单次测试和字段必要性分析，并输出可复用的 Python 代码。
-        </p>
-        <div className="workspace-hero-grid">
-          {heroMetrics.map((item) => (
-            <div key={item.label} className="workspace-hero-metric">
-              <p className="workspace-hero-metric-label">{item.label}</p>
-              <p className="workspace-hero-metric-value">{item.value}</p>
-              <p className="workspace-hero-metric-copy">{item.copy}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section className="workspace-section">
         <div className="workspace-section-header">
           <div>
@@ -348,7 +331,17 @@ export function RequestLabWorkspace() {
           </Badge>
         </div>
 
-        <div className="editorial-grid editorial-grid-2 p-4 xl:p-5">
+        <div className="editorial-grid editorial-grid-2 p-3 xl:p-4">
+          <div className="grid gap-2 xl:grid-cols-3 xl:col-span-2">
+            {heroMetrics.map((item) => (
+              <div key={item.label} className="metric-card">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{item.label}</p>
+                <p className="mt-2 text-base font-semibold text-foreground">{item.value}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.copy}</p>
+              </div>
+            ))}
+          </div>
+
           <RequestLabInputPanel
             inputType={inputType}
             onInputTypeChange={setInputType}
@@ -371,7 +364,7 @@ export function RequestLabWorkspace() {
             onClearAll={clearResults}
           />
 
-          <div className="flex min-h-[420px] min-w-0 flex-col xl:min-h-0">
+          <div className="flex min-h-[420px] min-w-0 flex-col xl:min-h-0 xl:col-span-2">
             <RequestLabResultsPanel
               activeRightPanelTab={activeRightPanelTab}
               onRightPanelTabChange={setActiveRightPanelTab}

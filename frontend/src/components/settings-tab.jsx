@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { FolderOpen, RotateCcw, Save, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from './ui/badge.jsx';
 import { Button } from './ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx';
 import { Input } from './ui/input.jsx';
@@ -94,56 +93,18 @@ export function SettingsTab() {
 
   return (
     <div className="workspace-page">
-      <section className="workspace-hero">
-        <p className="workspace-kicker">设置</p>
-        <h1 className="workspace-hero-title">应用设置</h1>
-        <p className="workspace-hero-copy">
-          维护资源监听默认保存位置，让后续新任务都能在固定根目录下创建独立子目录。
-        </p>
-        <div className="workspace-hero-grid">
-          <div className="workspace-hero-metric">
-            <p className="workspace-hero-metric-label">当前保存目录</p>
-            <p className="workspace-hero-metric-value">{saveRootDir || '未设置'}</p>
-            <p className="workspace-hero-metric-copy">新的资源监听任务会在这里创建按任务 UUID 隔离的子目录。</p>
-          </div>
-          <div className="workspace-hero-metric">
-            <p className="workspace-hero-metric-label">默认目录</p>
-            <p className="workspace-hero-metric-value">{defaultSaveRootDir || '--'}</p>
-            <p className="workspace-hero-metric-copy">恢复默认值时会回到这里。</p>
-          </div>
-          <div className="workspace-hero-metric">
-            <p className="workspace-hero-metric-label">当前动作</p>
-            <p className="workspace-hero-metric-value">
-              {isSaving ? '正在保存' : isBrowsing ? '选择目录中' : isResetting ? '恢复默认中' : '待命'}
-            </p>
-            <p className="workspace-hero-metric-copy">所有动作都会直接影响后续新任务的保存根目录。</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="workspace-section">
-        <div className="workspace-section-header">
-          <div>
-            <h2 className="workspace-section-title">保存位置</h2>
-            <p className="workspace-section-copy">
-              修改后会立即保存为新的默认根目录。也可以先选择目录，再决定保存或恢复默认值。
-            </p>
-          </div>
-          <Badge variant="outline">默认目录</Badge>
-        </div>
-
-        <Card className="glass-panel overflow-hidden border-0">
+      <Card className="glass-panel max-w-[720px] overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-[var(--brand-red)]" />
-              应用设置
+              保存目录
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-800">资源监听页面保存文件的位置</p>
+              <p className="text-sm font-medium text-slate-800">资源监听页面的默认保存位置</p>
               <p className="text-sm text-muted-foreground">
-                新的资源监听任务会在这里创建按任务 UUID 隔离的子目录。
+                新的资源监听任务会在这个目录下创建按任务 UUID 隔离的子目录。
               </p>
             </div>
 
@@ -192,7 +153,6 @@ export function SettingsTab() {
             </div>
           </CardContent>
         </Card>
-      </section>
     </div>
   );
 }
