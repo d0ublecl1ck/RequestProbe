@@ -1,0 +1,5 @@
+- Read [docs/dev/2026-04-21-jsx-missing-import-regression.md](/Users/d0ublecl1ck/RequestProbe/docs/dev/2026-04-21-jsx-missing-import-regression.md) before changing React JSX page structure or adding new UI component references.
+- Verify that every newly used JSX component symbol is explicitly imported in the same file before finishing any React frontend edit.
+- Manually scan newly added capitalized JSX identifiers against the import list after each React UI refactor.
+- Run the frontend build after React JSX structure changes, and block completion if any missing-import regression appears.
+- Treat missing JSX imports that cause runtime `ReferenceError` as a prohibited low-level mistake and do not repeat them.

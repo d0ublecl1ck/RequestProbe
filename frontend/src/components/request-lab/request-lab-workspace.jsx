@@ -12,6 +12,7 @@ import {
   TestFieldNecessity,
   TestRequestOnly,
 } from '../../../wailsjs/go/main/App.js';
+import { Badge } from '../ui/badge.jsx';
 import { RequestLabInputPanel } from './request-lab-input-panel.jsx';
 import { RequestLabResultsPanel } from './request-lab-results-panel.jsx';
 
@@ -297,54 +298,98 @@ export function RequestLabWorkspace() {
     }
   };
 
+  const heroMetrics = [
+    {
+      label: '输入模式',
+      value: inputType === 'auto' ? '自动检测' : inputType === 'raw' ? 'Raw HTTP' : 'Curl 命令',
+      copy: detectedType ? `已识别为 ${detectedType === 'curl' ? 'Curl' : detectedType === 'raw' ? 'Raw HTTP' : '未知格式'}` : '粘贴请求后自动推断格式',
+    },
+    {
+      label: '当前阶段',
+      value: parsedRequest ? '已完成解析' : '等待输入',
+      copy: parsedRequest ? '可以继续进行单次测试或字段分析' : '先输入请求文本，再触发解析',
+    },
+    {
+      label: '结果焦点',
+      value: activeRightPanelTab === 'analysis-group' ? '测试摘要' : '代码与测试',
+      copy: testResult ? '最近一次字段分析结果已生成' : '右侧负责承载测试与简化代码',
+    },
+  ];
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto xl:overflow-hidden">
-      <div className="mb-4 shrink-0 xl:mb-6">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">字段探针</p>
-        <h2 className="mt-2 text-xl font-semibold text-foreground xl:text-2xl">请求分析</h2>
-      </div>
-
-      <div className="grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] xl:gap-6 xl:overflow-hidden">
-        <RequestLabInputPanel
-          inputType={inputType}
-          onInputTypeChange={setInputType}
-          detectedType={detectedType}
-          inputText={inputText}
-          onInputTextChange={setInputText}
-          onParseRequest={parseRequest}
-          isParsing={isParsing}
-          parsedRequest={parsedRequest}
-          validationType={validationType}
-          onValidationTypeChange={updateValidationType}
-          validationConfig={validationConfig}
-          onValidationConfigChange={setValidationConfig}
-          textMatchingInput={textMatchingInput}
-          onTextMatchingChange={updateTextMatching}
-          onSingleTest={() => testRequestOnly()}
-          isSingleTesting={isSingleTesting}
-          onFieldAnalysis={testFieldNecessity}
-          isTestRunning={isTestRunning}
-          onClearAll={clearResults}
-        />
-
-        <div className="flex min-h-[420px] min-w-0 flex-col rounded-xl xl:min-h-0 xl:h-full">
-          <RequestLabResultsPanel
-            activeRightPanelTab={activeRightPanelTab}
-            onRightPanelTabChange={setActiveRightPanelTab}
-            pythonCode={pythonCode}
-            singleTestResult={singleTestResult}
-            testResult={testResult}
-            testResultSummary={testResultSummary}
-            headerTestResults={headerTestResults}
-            cookieTestResults={cookieTestResults}
-            onCopyCode={copyCode}
-            badgeVariantByStatus={badgeVariantByStatus}
-            formatBytes={formatBytes}
-            formatDuration={formatDuration}
-            formatHeaders={formatHeaders}
-          />
+    <div className="workspace-page">
+      <section className="workspace-hero">
+        <p className="workspace-kicker">字段探针</p>
+        <h1 className="workspace-hero-title">请求分析</h1>
+        <p className="workspace-hero-copy">
+          粘贴原始请求后，依次完成解析、单次测试和字段必要性分析，并输出可复用的 Python 代码。
+        </p>
+        <div className="workspace-hero-grid">
+          {heroMetrics.map((item) => (
+            <div key={item.label} className="workspace-hero-metric">
+              <p className="workspace-hero-metric-label">{item.label}</p>
+              <p className="workspace-hero-metric-value">{item.value}</p>
+              <p className="workspace-hero-metric-copy">{item.copy}</p>
+            </div>
+          ))}
         </div>
-      </div>
+      </section>
+
+      <section className="workspace-section">
+        <div className="workspace-section-header">
+          <div>
+            <h2 className="workspace-section-title">分析工作台</h2>
+            <p className="workspace-section-copy">
+              左侧配置输入和验证条件，右侧查看代码、测试结果和简化脚本。
+            </p>
+          </div>
+          <Badge variant={parsedRequest ? 'success' : 'outline'}>
+            {parsedRequest ? '解析完成' : '待输入'}
+          </Badge>
+        </div>
+
+        <div className="editorial-grid editorial-grid-2 p-4 xl:p-5">
+          <RequestLabInputPanel
+            inputType={inputType}
+            onInputTypeChange={setInputType}
+            detectedType={detectedType}
+            inputText={inputText}
+            onInputTextChange={setInputText}
+            onParseRequest={parseRequest}
+            isParsing={isParsing}
+            parsedRequest={parsedRequest}
+            validationType={validationType}
+            onValidationTypeChange={updateValidationType}
+            validationConfig={validationConfig}
+            onValidationConfigChange={setValidationConfig}
+            textMatchingInput={textMatchingInput}
+            onTextMatchingChange={updateTextMatching}
+            onSingleTest={() => testRequestOnly()}
+            isSingleTesting={isSingleTesting}
+            onFieldAnalysis={testFieldNecessity}
+            isTestRunning={isTestRunning}
+            onClearAll={clearResults}
+          />
+
+          <div className="flex min-h-[420px] min-w-0 flex-col xl:min-h-0">
+            <RequestLabResultsPanel
+              activeRightPanelTab={activeRightPanelTab}
+              onRightPanelTabChange={setActiveRightPanelTab}
+              pythonCode={pythonCode}
+              singleTestResult={singleTestResult}
+              testResult={testResult}
+              testResultSummary={testResultSummary}
+              headerTestResults={headerTestResults}
+              cookieTestResults={cookieTestResults}
+              onCopyCode={copyCode}
+              badgeVariantByStatus={badgeVariantByStatus}
+              formatBytes={formatBytes}
+              formatDuration={formatDuration}
+              formatHeaders={formatHeaders}
+            />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -14,7 +14,7 @@ function ResultDetailsTabs({ singleTestResult, formatHeaders }) {
       value: 'body',
       label: '响应体',
       content: (
-        <div className="rounded-xl border border-border/60 bg-white/70 p-4">
+        <div className="border border-border bg-[var(--paper-alt)] p-4">
           <pre className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-relaxed text-slate-700">
             {singleTestResult.body}
           </pre>
@@ -25,7 +25,7 @@ function ResultDetailsTabs({ singleTestResult, formatHeaders }) {
       value: 'headers',
       label: '响应头',
       content: (
-        <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+        <div className="border border-border bg-[var(--paper-alt)] p-3">
           <Table>
             <TableHeader>
               <TableRow>
@@ -52,7 +52,7 @@ function ResultDetailsTabs({ singleTestResult, formatHeaders }) {
       value: 'cookies',
       label: 'Cookies',
       content: (
-        <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+        <div className="border border-border bg-[var(--paper-alt)] p-3">
           <Table>
             <TableHeader>
               <TableRow>
@@ -83,7 +83,7 @@ function ResultDetailsTabs({ singleTestResult, formatHeaders }) {
       defaultValue="body"
       tabs={tabs}
       className="min-h-0 min-w-0"
-      listClassName="max-w-full"
+      listClassName="max-w-full bg-[var(--paper-alt)]"
       contentClassName="min-h-0 flex-1 pt-2"
     />
   );
@@ -135,7 +135,7 @@ function RequestTestGroup({
               </MetricCard>
             </div>
 
-            <div className="rounded-xl border border-border/60 bg-white/70 p-4 text-sm">
+            <div className="border border-border bg-[var(--paper-alt)] p-4 text-sm">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">最终 URL</p>
               <p className="mt-2 break-all font-medium text-foreground">{singleTestResult.url}</p>
             </div>
@@ -197,7 +197,7 @@ function AnalysisGroup({
             </div>
 
             {headerTestResults.length > 0 ? (
-              <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+              <div className="border border-border bg-[var(--paper-alt)] p-3">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-semibold">Headers 测试结果</p>
                   <Badge variant="outline">{headerTestResults.length} 条</Badge>
@@ -230,7 +230,7 @@ function AnalysisGroup({
             ) : null}
 
             {cookieTestResults.length > 0 ? (
-              <div className="rounded-xl border border-border/60 bg-white/70 p-3">
+              <div className="border border-border bg-[var(--paper-alt)] p-3">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-semibold">Cookies 测试结果</p>
                   <Badge variant="outline">{cookieTestResults.length} 条</Badge>
@@ -330,13 +330,20 @@ export function RequestLabResultsPanel({
   ];
 
   return (
-    <TabNavigator
-      value={activeRightPanelTab}
-      onValueChange={onRightPanelTabChange}
-      tabs={tabs}
-      className="flex h-full min-h-0 min-w-0 flex-col gap-4 pr-1"
-      listClassName="max-w-full self-start"
-      contentClassName="mt-0 min-h-0 flex-1 overflow-y-auto pr-1"
-    />
+    <ContainerCard
+      title="结果浏览"
+      description="按阶段切换查看代码、单次测试结果、字段摘要与精简脚本。"
+      className="flex h-full min-h-0 min-w-0 flex-col"
+      contentClassName="flex min-h-0 flex-1 flex-col"
+    >
+      <TabNavigator
+        value={activeRightPanelTab}
+        onValueChange={onRightPanelTabChange}
+        tabs={tabs}
+        className="flex h-full min-h-0 min-w-0 flex-col gap-4"
+        listClassName="max-w-full self-start bg-[var(--paper-alt)]"
+        contentClassName="mt-0 min-h-0 flex-1 overflow-y-auto"
+      />
+    </ContainerCard>
   );
 }

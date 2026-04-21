@@ -9,10 +9,8 @@ import { Textarea } from '../ui/textarea.jsx';
 import { Badge } from '../ui/badge.jsx';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group.jsx';
 import { CardFooter } from '../ui/card.jsx';
-import { CheckboxCard } from '../shared/checkbox-card.jsx';
 import { ContainerCard } from '../shared/container-card.jsx';
 import { FormSection } from '../shared/form-section.jsx';
-import { RadioCardGroup } from '../shared/radio-card-group.jsx';
 
 const INPUT_TYPE_OPTIONS = [
   { value: 'auto', label: '自动检测' },
@@ -53,7 +51,8 @@ export function RequestLabInputPanel({
 }) {
   return (
     <ContainerCard
-      title="请求输入"
+      title="输入与校验"
+      description="选择输入来源、粘贴原始请求，并定义后续测试要使用的验证条件。"
       icon={ScanSearch}
       className="flex min-h-[420px] min-w-0 flex-col xl:h-full xl:min-h-0"
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
@@ -61,12 +60,17 @@ export function RequestLabInputPanel({
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-6 p-6">
           <FormSection title="输入类型">
-            <RadioCardGroup
-              value={inputType}
-              onValueChange={onInputTypeChange}
-              options={INPUT_TYPE_OPTIONS}
-              className="grid grid-cols-3 gap-2"
-            />
+            <RadioGroup value={inputType} onValueChange={onInputTypeChange} className="grid grid-cols-3 gap-2">
+              {INPUT_TYPE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-foreground transition hover:border-foreground"
+                >
+                  <span>{option.label}</span>
+                  <RadioGroupItem value={option.value} />
+                </label>
+              ))}
+            </RadioGroup>
           </FormSection>
 
           <FormSection title="请求内容">
@@ -81,8 +85,8 @@ export function RequestLabInputPanel({
             <Textarea
               value={inputText}
               onChange={(event) => onInputTextChange(event.target.value)}
-              placeholder="请输入HTTP请求或Curl命令..."
-              className="min-h-[220px] resize-none bg-white/80"
+              placeholder="请输入 HTTP 请求或 Curl 命令..."
+              className="min-h-[220px] resize-none bg-white"
             />
           </FormSection>
 
@@ -111,12 +115,17 @@ export function RequestLabInputPanel({
                 </div>
 
                 <FormSection title="验证方式">
-                  <RadioCardGroup
-                    value={validationType}
-                    onValueChange={onValidationTypeChange}
-                    options={VALIDATION_TYPE_OPTIONS}
-                    className="grid grid-cols-2 gap-2"
-                  />
+                  <RadioGroup value={validationType} onValueChange={onValidationTypeChange} className="grid grid-cols-2 gap-2">
+                    {VALIDATION_TYPE_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-foreground transition hover:border-foreground"
+                      >
+                        <span>{option.label}</span>
+                        <RadioGroupItem value={option.value} />
+                      </label>
+                    ))}
+                  </RadioGroup>
                 </FormSection>
 
                 {validationType === 'textMatching' ? (
@@ -131,7 +140,7 @@ export function RequestLabInputPanel({
                           {MATCH_MODE_OPTIONS.map((option) => (
                             <label
                               key={option.value}
-                              className="flex items-center justify-between rounded-md border border-border/60 bg-white/70 px-3 py-2 text-xs font-medium"
+                              className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em]"
                             >
                               <span>{option.label}</span>
                               <RadioGroupItem value={option.value} />
@@ -141,14 +150,17 @@ export function RequestLabInputPanel({
                       </div>
                       <div className="space-y-2">
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">区分大小写</p>
-                        <CheckboxCard
-                          checked={validationConfig.textMatching.caseSensitive}
-                          onCheckedChange={(checked) => onValidationConfigChange((prev) => ({
-                            ...prev,
-                            textMatching: { ...prev.textMatching, caseSensitive: Boolean(checked) },
-                          }))}
-                          label="大小写敏感"
-                        />
+                        <label className="flex items-center gap-2 border border-border bg-white px-3 py-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={validationConfig.textMatching.caseSensitive}
+                            onChange={(event) => onValidationConfigChange((prev) => ({
+                              ...prev,
+                              textMatching: { ...prev.textMatching, caseSensitive: event.target.checked },
+                            }))}
+                          />
+                          <span>大小写敏感</span>
+                        </label>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -157,7 +169,7 @@ export function RequestLabInputPanel({
                         value={textMatchingInput}
                         onChange={(event) => onTextMatchingChange(event.target.value)}
                         placeholder="每行一个匹配文本，例如 success"
-                        className="min-h-[120px] bg-white/80"
+                        className="min-h-[120px] bg-white"
                       />
                     </div>
                   </FormSection>

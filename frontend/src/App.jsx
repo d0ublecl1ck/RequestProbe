@@ -1,65 +1,47 @@
 import React, { useState } from 'react';
-import { Github } from 'lucide-react';
 import { Toaster } from 'sonner';
 
-import { MainContainer } from './components/layout/main-container.jsx';
 import { WorkspaceSidebar } from './components/layout/workspace-sidebar.jsx';
 import { RequestLabWorkspace } from './components/request-lab/request-lab-workspace.jsx';
 import { ResourceMonitorTab } from './components/resource-monitor-tab.jsx';
 import { SettingsTab } from './components/settings-tab.jsx';
 import { TooltipProvider } from './components/ui/tooltip.jsx';
 import { Tabs, TabsContent } from './components/ui/tabs.jsx';
-import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
-
-const GITHUB_URL = 'https://github.com/d0ublecl1ck/RequestProbe';
 
 const workspaceItems = [
   {
     value: 'request-lab',
     label: '字段探针',
+    subtitle: '解析请求、测试字段必要性、生成 Python 代码',
   },
   {
     value: 'resource-monitor',
     label: '资源监听',
+    subtitle: '启动浏览器监听任务，采集资源与请求',
   },
   {
     value: 'settings',
     label: '设置',
+    subtitle: '维护资源监听默认保存位置与全局选项',
   },
 ];
 
 export default function App() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState('request-lab');
 
-  const openGithub = async () => {
-    try {
-      await BrowserOpenURL(GITHUB_URL);
-    } catch {
-      window.open(GITHUB_URL, '_blank', 'noopener,noreferrer');
-    }
-  };
-
   return (
     <TooltipProvider>
       <div className="app-shell">
         <Toaster richColors position="top-right" />
-        <div className="relative z-10 mx-auto flex h-dvh w-[90vw] min-w-0 max-w-[1728px] overflow-hidden py-[clamp(12px,2vh,32px)]">
+        <div className="app-workspace-frame">
           <Tabs
             value={activeWorkspaceTab}
             onValueChange={setActiveWorkspaceTab}
-            className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch xl:gap-6"
+            className="workspace-shell"
           >
-            <WorkspaceSidebar
-              title="RequestProbe"
-              items={workspaceItems}
-              value={activeWorkspaceTab}
-              onChange={setActiveWorkspaceTab}
-              actionIcon={Github}
-              actionLabel="打开 GitHub"
-              onAction={openGithub}
-            />
+            <WorkspaceSidebar items={workspaceItems} value={activeWorkspaceTab} onChange={setActiveWorkspaceTab} />
 
-            <MainContainer>
+            <div className="workspace-main min-h-0 min-w-0 flex-1 overflow-hidden">
               <TabsContent value="request-lab" className="mt-0 h-full overflow-hidden">
                 <RequestLabWorkspace />
               </TabsContent>
@@ -71,7 +53,7 @@ export default function App() {
               <TabsContent value="settings" className="mt-0 h-full overflow-hidden">
                 <SettingsTab />
               </TabsContent>
-            </MainContainer>
+            </div>
           </Tabs>
         </div>
       </div>

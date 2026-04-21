@@ -40,6 +40,7 @@ import {
 } from '../../wailsjs/go/main/App.js';
 
 const DEFAULT_EXTENSIONS = ['js', 'wasm'];
+const EMPTY_ITEMS = [];
 const OPENERS = [
   {
     value: 'finder',
@@ -85,6 +86,34 @@ const getEventPayload = (eventArgs) => {
   return eventArgs;
 };
 
+const normalizeTask = (value) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const resources = Array.isArray(value.resources) ? value.resources : EMPTY_ITEMS;
+  const requests = Array.isArray(value.requests) ? value.requests : EMPTY_ITEMS;
+  const hasIdentity = Boolean(
+    value.taskId
+      || value.status
+      || value.downloadDir
+      || value.createdAt
+      || value.updatedAt
+      || resources.length
+      || requests.length,
+  );
+
+  if (!hasIdentity) {
+    return null;
+  }
+
+  return {
+    ...value,
+    resources,
+    requests,
+  };
+};
+
 export function ResourceMonitorTab() {
   const [url, setUrl] = useState('');
   const [availableExtensions, setAvailableExtensions] = useState(DEFAULT_EXTENSIONS);
@@ -100,8 +129,8 @@ export function ResourceMonitorTab() {
   const [saveRootDir, setSaveRootDir] = useState('');
   const [activeView, setActiveView] = useState('resources');
 
-  const resources = task?.resources || [];
-  const requests = task?.requests || [];
+  const resources = task?.resources ?? EMPTY_ITEMS;
+  const requests = task?.requests ?? EMPTY_ITEMS;
   const taskStatus = task?.status || 'idle';
   const statusInfo = statusMeta[taskStatus] || statusMeta.idle;
   const activeSelectionIds = useMemo(
@@ -128,13 +157,14 @@ export function ResourceMonitorTab() {
         setAvailableExtensions(nextExtensions);
         setSaveRootDir(settings?.saveRootDir || '');
 
-        if (currentTask) {
-          setTask(currentTask);
-          if (currentTask.url) {
-            setUrl(currentTask.url);
+        const normalizedTask = normalizeTask(currentTask);
+        if (normalizedTask) {
+          setTask(normalizedTask);
+          if (normalizedTask.url) {
+            setUrl(normalizedTask.url);
           }
-          if (currentTask.selectedExtensions?.length) {
-            setSelectedExtensions(currentTask.selectedExtensions);
+          if (normalizedTask.selectedExtensions?.length) {
+            setSelectedExtensions(normalizedTask.selectedExtensions);
           }
         } else {
           setSelectedExtensions((prev) => prev.length ? prev : DEFAULT_EXTENSIONS.filter((item) => nextExtensions.includes(item)));
@@ -151,7 +181,7 @@ export function ResourceMonitorTab() {
       const payload = getEventPayload(args);
       if (!payload) return;
       if (payload.task) {
-        setTask(payload.task);
+        setTask(normalizeTask(payload.task));
       }
       if (payload.type === 'resources_downloaded' && payload.download) {
         toast.success(`已下载 ${payload.download.downloadedIds?.length || 0} 个资源`);
@@ -169,11 +199,27 @@ export function ResourceMonitorTab() {
 
   useEffect(() => {
     setSelectedIds((prev) => {
+      if (resources.length === 0) {
+        if (Object.keys(prev).length === 0) {
+          return prev;
+        }
+        return {};
+      }
+
       const next = {};
       for (const item of resources) {
         if (prev[item.id]) {
           next[item.id] = true;
         }
+      }
+
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (
+        prevKeys.length === nextKeys.length
+        && prevKeys.every((key) => next[key] === prev[key])
+      ) {
+        return prev;
       }
       return next;
     });
@@ -200,7 +246,7 @@ export function ResourceMonitorTab() {
     setIsStarting(true);
     try {
       const nextTask = await StartResourceMonitor(url.trim(), selectedExtensions);
-      setTask(nextTask);
+      setTask(normalizeTask(nextTask));
       setSelectedIds({});
       toast.success('资源监听已启动');
     } catch (error) {
@@ -215,7 +261,7 @@ export function ResourceMonitorTab() {
     setIsMutatingTask(true);
     try {
       const nextTask = await handler();
-      setTask(nextTask);
+      setTask(normalizeTask(nextTask));
       toast.success(successMessage);
     } catch (error) {
       const message = error?.message || error?.toString() || '操作失败';
@@ -240,7 +286,7 @@ export function ResourceMonitorTab() {
         toast.warning('所选资源均已存在或不可下载');
       }
       const refreshedTask = await GetResourceMonitorTask();
-      setTask(refreshedTask);
+      setTask(normalizeTask(refreshedTask));
     } catch (error) {
       const message = error?.message || error?.toString() || '下载失败';
       toast.error(message);
@@ -274,14 +320,61 @@ export function ResourceMonitorTab() {
     setSelectedIds(next);
   };
 
+  const heroMetrics = [
+    {
+      label: '任务状态',
+      value: statusInfo.label,
+      copy: task?.taskId ? `任务 ${task.taskId.slice(0, 8)} 已建立上下文` : '等待创建新的监听任务',
+    },
+    {
+      label: '资源命中',
+      value: `${resources.length}`,
+      copy: activeSelectionIds.length > 0 ? `当前已选中 ${activeSelectionIds.length} 个资源` : '资源列表会按内容哈希去重',
+    },
+    {
+      label: '请求流',
+      value: `${requests.length}`,
+      copy: taskStatus === 'running' ? '当前会话正在持续接收新请求' : '启动任务后同步采集页面请求',
+    },
+  ];
+
   return (
-    <div className="grid h-full min-h-0 min-w-0 gap-4 overflow-y-auto xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] xl:gap-6 xl:overflow-hidden">
-      <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:gap-6 xl:overflow-y-auto xl:pr-1">
-        <Card className="glass-panel overflow-hidden">
+    <div className="workspace-page">
+      <section className="workspace-hero">
+        <p className="workspace-kicker">资源监听</p>
+        <h1 className="workspace-hero-title">任务监听</h1>
+        <p className="workspace-hero-copy">
+          在同一个浏览器任务里同时追踪资源和请求，并管理启动、暂停、恢复、结束与下载动作。
+        </p>
+        <div className="workspace-hero-grid">
+          {heroMetrics.map((item) => (
+            <div key={item.label} className="workspace-hero-metric">
+              <p className="workspace-hero-metric-label">{item.label}</p>
+              <p className="workspace-hero-metric-value">{item.value}</p>
+              <p className="workspace-hero-metric-copy">{item.copy}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="workspace-section">
+        <div className="workspace-section-header">
+          <div>
+            <h2 className="workspace-section-title">任务控制与结果浏览</h2>
+            <p className="workspace-section-copy">
+              左侧配置目标、后缀和任务状态，右侧浏览命中资源与请求流。
+            </p>
+          </div>
+          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+        </div>
+
+        <div className="editorial-grid editorial-grid-2 p-4 xl:p-5">
+          <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:gap-5 xl:overflow-y-auto xl:pr-1">
+            <Card className="glass-panel overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Link2 className="h-5 w-5 text-emerald-500" />
-              监听任务
+              任务启动
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -291,7 +384,7 @@ export function ResourceMonitorTab() {
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder="https://example.com/app"
-                className="bg-white/80"
+                className="bg-white"
               />
             </div>
 
@@ -322,9 +415,9 @@ export function ResourceMonitorTab() {
               {isStarting ? '正在启动...' : '开始监听'}
             </Button>
           </CardContent>
-        </Card>
+            </Card>
 
-        <Card className="glass-panel overflow-hidden monitor-status-card">
+            <Card className="glass-panel overflow-hidden monitor-status-card">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-3">
               <span>任务状态</span>
@@ -409,44 +502,44 @@ export function ResourceMonitorTab() {
               }}
             />
           </CardContent>
-        </Card>
-      </div>
+            </Card>
+          </div>
 
-      <Card className="glass-panel flex min-h-[420px] min-w-0 flex-col overflow-hidden xl:min-h-0">
-        <Tabs
-          value={activeView}
-          onValueChange={setActiveView}
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-        >
-          <CardHeader className="flex flex-col gap-3 border-b border-border/60 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle>{activeView === 'resources' ? '命中资源列表' : '请求监听列表'}</CardTitle>
-              <TabsList className="bg-white/65">
-                <TabsTrigger value="resources">资源</TabsTrigger>
-                <TabsTrigger value="requests">请求</TabsTrigger>
-              </TabsList>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {activeView === 'resources' && (
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={downloadSelected}
-                  disabled={isDownloading || activeSelectionIds.length === 0}
-                >
-                  {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  下载选中项
-                </Button>
-              )}
-            </div>
-          </CardHeader>
+          <Card className="glass-panel flex min-h-[420px] min-w-0 flex-col overflow-hidden xl:min-h-0">
+            <Tabs
+              value={activeView}
+              onValueChange={setActiveView}
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
+              <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3">
+                  <CardTitle>{activeView === 'resources' ? '命中资源列表' : '请求监听列表'}</CardTitle>
+                  <TabsList className="bg-[var(--paper-alt)]">
+                    <TabsTrigger value="resources">资源</TabsTrigger>
+                    <TabsTrigger value="requests">请求</TabsTrigger>
+                  </TabsList>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeView === 'resources' && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={downloadSelected}
+                      disabled={isDownloading || activeSelectionIds.length === 0}
+                    >
+                      {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      下载选中项
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
 
-          <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0">
-            <TabsContent value="resources" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0">
+                <TabsContent value="resources" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               {resources.length > 0 ? (
                 <ScrollArea className="min-h-0 flex-1">
                   <div className="p-4">
-                    <div className="mb-3 flex items-center justify-between rounded-xl border border-border/60 bg-white/70 px-4 py-3">
+                    <div className="mb-3 flex items-center justify-between border border-border bg-[var(--paper-alt)] px-4 py-3">
                       <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
                         <Checkbox
                           checked={allChecked}
@@ -457,7 +550,7 @@ export function ResourceMonitorTab() {
                       <Badge variant="info">{activeSelectionIds.length} / {resources.length} 已选</Badge>
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-border/60 bg-white/70">
+                    <div className="overflow-hidden border border-border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -524,7 +617,7 @@ export function ResourceMonitorTab() {
                 </ScrollArea>
               ) : (
                 <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-sm text-muted-foreground">
-                  暂无资源
+                  当前还没有命中资源。启动监听后，这里会实时出现去重后的资源记录。
                 </div>
               )}
             </TabsContent>
@@ -533,7 +626,7 @@ export function ResourceMonitorTab() {
               {requests.length > 0 ? (
                 <ScrollArea className="min-h-0 flex-1">
                   <div className="p-4">
-                    <div className="overflow-hidden rounded-xl border border-border/60 bg-white/70">
+                    <div className="overflow-hidden border border-border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -596,13 +689,15 @@ export function ResourceMonitorTab() {
                 </ScrollArea>
               ) : (
                 <div className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-sm text-muted-foreground">
-                  暂无请求
+                  当前还没有请求事件。任务启动并加载页面后，这里会实时展示请求流。
                 </div>
               )}
             </TabsContent>
-          </CardContent>
-        </Tabs>
-      </Card>
+              </CardContent>
+            </Tabs>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }

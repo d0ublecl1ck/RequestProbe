@@ -27,7 +27,7 @@ export function ContainerCard({
             <div>
               {title && (
                 <CardTitle className="flex items-center gap-2">
-                  {Icon ? <Icon className="h-5 w-5 text-muted-foreground" /> : null}
+                  {Icon ? <Icon className="h-5 w-5 text-[var(--brand-red)]" /> : null}
                   <span className={Icon ? '' : 'section-title'}>{title}</span>
                 </CardTitle>
               )}
