@@ -49,7 +49,7 @@ func TestStartTaskReturnsWhenEventArrivesBeforeResponse(t *testing.T) {
 	)
 
 	go func() {
-		task, err = svc.StartTask(ctx, "https://example.com", []string{"js"})
+		task, err = svc.StartTask(ctx, "https://example.com", []string{"js"}, true)
 		close(done)
 	}()
 
@@ -137,7 +137,7 @@ func TestStartTaskAllowsEmptyURL(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	task, err := svc.StartTask(ctx, "", []string{"js"})
+	task, err := svc.StartTask(ctx, "", []string{"js"}, true)
 	if err != nil {
 		t.Fatalf("空 URL 启动不应失败: %v", err)
 	}
@@ -181,6 +181,67 @@ func TestHandleWorkerEventTracksRequests(t *testing.T) {
 	}
 }
 
+func TestDownloadRequestsUpdatesTaskState(t *testing.T) {
+	svc := NewResourceMonitorService()
+	svc.task = makeTask(models.ResourceMonitorStatusRunning)
+	svc.task.Requests = []*models.MonitoredRequest{
+		{
+			ID:                "req-1",
+			URL:               "https://example.com/api/users",
+			Method:            "GET",
+			SuggestedFileName: "get-users-req-1.json",
+			FirstSeenAt:       time.Now().UTC().Format(time.RFC3339Nano),
+		},
+	}
+	svc.worker = &fakeMonitorWorker{
+		requestFn: func(ctx context.Context, cmdType string, payload interface{}, out interface{}) error {
+			if cmdType != "download_requests" {
+				t.Fatalf("命令类型错误: %s", cmdType)
+			}
+			data, ok := payload.(map[string]interface{})
+			if !ok {
+				t.Fatalf("payload 类型异常: %#v", payload)
+			}
+			ids, ok := data["requestIds"].([]string)
+			if !ok || len(ids) != 1 || ids[0] != "req-1" {
+				t.Fatalf("requestIds 传递错误: %#v", data["requestIds"])
+			}
+
+			result := out.(*models.DownloadRequestsResult)
+			*result = models.DownloadRequestsResult{
+				TaskID:        svc.task.TaskID,
+				DownloadDir:   filepath.Join(svc.task.DownloadDir, "requests"),
+				DownloadedIDs: []string{"req-1"},
+				DownloadedEntries: []*models.MonitoredRequest{
+					{
+						ID:             "req-1",
+						Downloaded:     true,
+						DownloadedPath: filepath.Join(svc.task.DownloadDir, "requests", "get-users-req-1.json"),
+					},
+				},
+			}
+			return nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	result, err := svc.DownloadRequests(ctx, []string{"req-1"})
+	if err != nil {
+		t.Fatalf("DownloadRequests 返回错误: %v", err)
+	}
+	if result == nil || len(result.DownloadedIDs) != 1 {
+		t.Fatalf("下载结果异常: %#v", result)
+	}
+	if !svc.task.Requests[0].Downloaded {
+		t.Fatal("任务中的请求下载状态未更新")
+	}
+	if svc.task.Requests[0].DownloadedPath == "" {
+		t.Fatal("任务中的请求下载路径未更新")
+	}
+}
+
 func TestUpdateSaveRootPersistsAndStartTaskUsesConfiguredRoot(t *testing.T) {
 	tempDir := t.TempDir()
 	settingsPath := filepath.Join(tempDir, "settings.json")
@@ -220,7 +281,7 @@ func TestUpdateSaveRootPersistsAndStartTaskUsesConfiguredRoot(t *testing.T) {
 		t.Fatalf("保存目录未更新，实际为 %q", settings.SaveRootDir)
 	}
 
-	task, err := svc.StartTask(ctx, "https://example.com", []string{"js"})
+	task, err := svc.StartTask(ctx, "https://example.com", []string{"js"}, true)
 	if err != nil {
 		t.Fatalf("StartTask 返回错误: %v", err)
 	}
@@ -251,6 +312,82 @@ func TestResetSaveRootFallsBackToDefault(t *testing.T) {
 	}
 	if settings.SaveRootDir != defaultRoot {
 		t.Fatalf("重置后应回退到默认目录，实际为 %q", settings.SaveRootDir)
+	}
+}
+
+func TestStartTaskDefaultsToConfiguredListenScope(t *testing.T) {
+	svc := NewResourceMonitorService()
+	svc.workerFactory = func(ctx context.Context, eventFn func(pythonMessage)) (resourceMonitorWorker, error) {
+		return &fakeMonitorWorker{
+			requestFn: func(ctx context.Context, cmdType string, payload interface{}, out interface{}) error {
+				data, ok := payload.(map[string]interface{})
+				if !ok {
+					t.Fatalf("payload 类型异常: %#v", payload)
+				}
+
+				listenAllTabs, ok := data["listenAllTabs"].(bool)
+				if !ok {
+					t.Fatalf("listenAllTabs 类型异常: %#v", data["listenAllTabs"])
+				}
+				if !listenAllTabs {
+					t.Fatal("默认启动应传递 listenAllTabs=true")
+				}
+
+				task := out.(*models.ResourceMonitorTask)
+				*task = *makeTask(models.ResourceMonitorStatusRunning)
+				task.ListenAllTabs = listenAllTabs
+				return nil
+			},
+		}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	task, err := svc.StartTask(ctx, "https://example.com", []string{"js"}, true)
+	if err != nil {
+		t.Fatalf("StartTask 返回错误: %v", err)
+	}
+	if task == nil || !task.ListenAllTabs {
+		t.Fatalf("任务应记录 listenAllTabs=true，实际为 %#v", task)
+	}
+}
+
+func TestStartTaskCanDisableAllTabsListening(t *testing.T) {
+	svc := NewResourceMonitorService()
+	svc.workerFactory = func(ctx context.Context, eventFn func(pythonMessage)) (resourceMonitorWorker, error) {
+		return &fakeMonitorWorker{
+			requestFn: func(ctx context.Context, cmdType string, payload interface{}, out interface{}) error {
+				data, ok := payload.(map[string]interface{})
+				if !ok {
+					t.Fatalf("payload 类型异常: %#v", payload)
+				}
+
+				listenAllTabs, ok := data["listenAllTabs"].(bool)
+				if !ok {
+					t.Fatalf("listenAllTabs 类型异常: %#v", data["listenAllTabs"])
+				}
+				if listenAllTabs {
+					t.Fatal("关闭全标签页监听时应传递 listenAllTabs=false")
+				}
+
+				task := out.(*models.ResourceMonitorTask)
+				*task = *makeTask(models.ResourceMonitorStatusRunning)
+				task.ListenAllTabs = listenAllTabs
+				return nil
+			},
+		}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	task, err := svc.StartTask(ctx, "https://example.com", []string{"js"}, false)
+	if err != nil {
+		t.Fatalf("StartTask 返回错误: %v", err)
+	}
+	if task == nil || task.ListenAllTabs {
+		t.Fatalf("任务应记录 listenAllTabs=false，实际为 %#v", task)
 	}
 }
 
@@ -311,6 +448,7 @@ func makeTask(status models.ResourceMonitorStatus) *models.ResourceMonitorTask {
 		URL:                "https://example.com",
 		Status:             status,
 		SelectedExtensions: []string{"js"},
+		ListenAllTabs:      true,
 		DownloadDir:        "/tmp/task-1",
 		CreatedAt:          now,
 		UpdatedAt:          now,

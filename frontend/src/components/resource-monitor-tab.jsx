@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
 import { OpenerSelect } from './resource-monitor/opener-select.jsx';
 import { EventsOn } from '../../wailsjs/runtime/runtime.js';
 import {
+  DownloadSelectedRequests,
   GetResourceMonitorSettings,
   DownloadSelectedResources,
   EndResourceMonitor,
@@ -109,6 +110,7 @@ const normalizeTask = (value) => {
 
   return {
     ...value,
+    listenAllTabs: value.listenAllTabs !== false,
     resources,
     requests,
   };
@@ -118,10 +120,13 @@ export function ResourceMonitorTab() {
   const [url, setUrl] = useState('');
   const [availableExtensions, setAvailableExtensions] = useState(DEFAULT_EXTENSIONS);
   const [selectedExtensions, setSelectedExtensions] = useState(DEFAULT_EXTENSIONS);
+  const [listenAllTabs, setListenAllTabs] = useState(true);
   const [task, setTask] = useState(null);
-  const [selectedIds, setSelectedIds] = useState({});
+  const [selectedResourceIds, setSelectedResourceIds] = useState({});
+  const [selectedRequestIds, setSelectedRequestIds] = useState({});
   const [isStarting, setIsStarting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingResources, setIsDownloadingResources] = useState(false);
+  const [isDownloadingRequests, setIsDownloadingRequests] = useState(false);
   const [isMutatingTask, setIsMutatingTask] = useState(false);
   const [isOpeningFinder, setIsOpeningFinder] = useState(false);
   const [isOpeningVSCode, setIsOpeningVSCode] = useState(false);
@@ -133,12 +138,18 @@ export function ResourceMonitorTab() {
   const requests = task?.requests ?? EMPTY_ITEMS;
   const taskStatus = task?.status || 'idle';
   const statusInfo = statusMeta[taskStatus] || statusMeta.idle;
-  const activeSelectionIds = useMemo(
-    () => Object.entries(selectedIds).filter(([, checked]) => checked).map(([id]) => id),
-    [selectedIds],
+  const activeResourceSelectionIds = useMemo(
+    () => Object.entries(selectedResourceIds).filter(([, checked]) => checked).map(([id]) => id),
+    [selectedResourceIds],
   );
-  const allChecked = resources.length > 0 && activeSelectionIds.length === resources.length;
-  const someChecked = activeSelectionIds.length > 0 && activeSelectionIds.length < resources.length;
+  const activeRequestSelectionIds = useMemo(
+    () => Object.entries(selectedRequestIds).filter(([, checked]) => checked).map(([id]) => id),
+    [selectedRequestIds],
+  );
+  const allResourcesChecked = resources.length > 0 && activeResourceSelectionIds.length === resources.length;
+  const someResourcesChecked = activeResourceSelectionIds.length > 0 && activeResourceSelectionIds.length < resources.length;
+  const allRequestsChecked = requests.length > 0 && activeRequestSelectionIds.length === requests.length;
+  const someRequestsChecked = activeRequestSelectionIds.length > 0 && activeRequestSelectionIds.length < requests.length;
 
   useEffect(() => {
     let mounted = true;
@@ -166,7 +177,9 @@ export function ResourceMonitorTab() {
           if (normalizedTask.selectedExtensions?.length) {
             setSelectedExtensions(normalizedTask.selectedExtensions);
           }
+          setListenAllTabs(normalizedTask.listenAllTabs !== false);
         } else {
+          setListenAllTabs(true);
           setSelectedExtensions((prev) => prev.length ? prev : DEFAULT_EXTENSIONS.filter((item) => nextExtensions.includes(item)));
         }
       } catch (error) {
@@ -186,6 +199,9 @@ export function ResourceMonitorTab() {
       if (payload.type === 'resources_downloaded' && payload.download) {
         toast.success(`已下载 ${payload.download.downloadedIds?.length || 0} 个资源`);
       }
+      if (payload.type === 'requests_downloaded' && payload.requestDownload) {
+        toast.success(`已下载 ${payload.requestDownload.downloadedIds?.length || 0} 个请求包`);
+      }
       if (payload.type === 'worker_log' && payload.message) {
         console.warn('[resource-monitor-worker]', payload.message);
       }
@@ -198,7 +214,7 @@ export function ResourceMonitorTab() {
   }, []);
 
   useEffect(() => {
-    setSelectedIds((prev) => {
+    setSelectedResourceIds((prev) => {
       if (resources.length === 0) {
         if (Object.keys(prev).length === 0) {
           return prev;
@@ -225,6 +241,34 @@ export function ResourceMonitorTab() {
     });
   }, [resources]);
 
+  useEffect(() => {
+    setSelectedRequestIds((prev) => {
+      if (requests.length === 0) {
+        if (Object.keys(prev).length === 0) {
+          return prev;
+        }
+        return {};
+      }
+
+      const next = {};
+      for (const item of requests) {
+        if (prev[item.id]) {
+          next[item.id] = true;
+        }
+      }
+
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (
+        prevKeys.length === nextKeys.length
+        && prevKeys.every((key) => next[key] === prev[key])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [requests]);
+
   const toggleExtension = (extension, checked) => {
     setSelectedExtensions((prev) => {
       const next = new Set(prev);
@@ -245,9 +289,10 @@ export function ResourceMonitorTab() {
 
     setIsStarting(true);
     try {
-      const nextTask = await StartResourceMonitor(url.trim(), selectedExtensions);
+      const nextTask = await StartResourceMonitor(url.trim(), selectedExtensions, listenAllTabs);
       setTask(normalizeTask(nextTask));
-      setSelectedIds({});
+      setSelectedResourceIds({});
+      setSelectedRequestIds({});
       toast.success('资源监听已启动');
     } catch (error) {
       const message = error?.message || error?.toString() || '启动失败';
@@ -272,14 +317,14 @@ export function ResourceMonitorTab() {
   };
 
   const downloadSelected = async () => {
-    if (activeSelectionIds.length === 0) {
+    if (activeResourceSelectionIds.length === 0) {
       toast.warning('请先勾选要下载的资源');
       return;
     }
 
-    setIsDownloading(true);
+    setIsDownloadingResources(true);
     try {
-      const result = await DownloadSelectedResources(activeSelectionIds);
+      const result = await DownloadSelectedResources(activeResourceSelectionIds);
       if (result?.downloadedIds?.length) {
         toast.success(`已下载 ${result.downloadedIds.length} 个资源`);
       } else {
@@ -291,7 +336,31 @@ export function ResourceMonitorTab() {
       const message = error?.message || error?.toString() || '下载失败';
       toast.error(message);
     } finally {
-      setIsDownloading(false);
+      setIsDownloadingResources(false);
+    }
+  };
+
+  const downloadSelectedRequests = async () => {
+    if (activeRequestSelectionIds.length === 0) {
+      toast.warning('请先勾选要下载的请求');
+      return;
+    }
+
+    setIsDownloadingRequests(true);
+    try {
+      const result = await DownloadSelectedRequests(activeRequestSelectionIds);
+      if (result?.downloadedIds?.length) {
+        toast.success(`已下载 ${result.downloadedIds.length} 个请求包`);
+      } else {
+        toast.warning('所选请求包均已存在或不可下载');
+      }
+      const refreshedTask = await GetResourceMonitorTask();
+      setTask(normalizeTask(refreshedTask));
+    } catch (error) {
+      const message = error?.message || error?.toString() || '下载失败';
+      toast.error(message);
+    } finally {
+      setIsDownloadingRequests(false);
     }
   };
 
@@ -308,16 +377,28 @@ export function ResourceMonitorTab() {
     }
   };
 
-  const toggleAll = (checked) => {
+  const toggleAllResources = (checked) => {
     if (!checked) {
-      setSelectedIds({});
+      setSelectedResourceIds({});
       return;
     }
     const next = {};
     for (const item of resources) {
       next[item.id] = true;
     }
-    setSelectedIds(next);
+    setSelectedResourceIds(next);
+  };
+
+  const toggleAllRequests = (checked) => {
+    if (!checked) {
+      setSelectedRequestIds({});
+      return;
+    }
+    const next = {};
+    for (const item of requests) {
+      next[item.id] = true;
+    }
+    setSelectedRequestIds(next);
   };
 
   const heroMetrics = [
@@ -329,12 +410,14 @@ export function ResourceMonitorTab() {
     {
       label: '资源命中',
       value: `${resources.length}`,
-      copy: activeSelectionIds.length > 0 ? `当前已选中 ${activeSelectionIds.length} 个资源` : '资源列表会按内容哈希去重',
+      copy: activeResourceSelectionIds.length > 0 ? `当前已选中 ${activeResourceSelectionIds.length} 个资源` : '资源列表会按内容哈希去重',
     },
     {
       label: '请求流',
       value: `${requests.length}`,
-      copy: taskStatus === 'running' ? '当前会话正在持续接收新请求' : '启动任务后同步采集页面请求',
+      copy: task?.listenAllTabs === false
+        ? '当前任务只接收启动标签页中的请求'
+        : (taskStatus === 'running' ? '当前会话中的全部标签页会持续接收新请求' : '启动任务后同步采集页面请求'),
     },
   ];
 
@@ -389,6 +472,19 @@ export function ResourceMonitorTab() {
               </div>
             </div>
 
+            <label className="monitor-option cursor-pointer">
+              <div className="space-y-1">
+                <p className="monitor-label">监听所有标签页</p>
+                <p className="text-xs text-slate-500">
+                  默认开启。关闭后只监听当前实现绑定的单个标签页。
+                </p>
+              </div>
+              <Checkbox
+                checked={listenAllTabs}
+                onCheckedChange={(checked) => setListenAllTabs(Boolean(checked))}
+              />
+            </label>
+
             <Button
               className="w-full gap-2"
               onClick={startTask}
@@ -420,6 +516,10 @@ export function ResourceMonitorTab() {
               <div className="monitor-metric sm:col-span-2">
                 <p className="monitor-label">已监听请求</p>
                 <p className="monitor-mono">{requests.length}</p>
+              </div>
+              <div className="monitor-metric sm:col-span-2">
+                <p className="monitor-label">监听范围</p>
+                <p className="monitor-mono">{task?.listenAllTabs === false ? '当前标签页' : '全部标签页'}</p>
               </div>
             </div>
 
@@ -518,10 +618,21 @@ export function ResourceMonitorTab() {
                       variant="outline"
                       className="gap-2"
                       onClick={downloadSelected}
-                      disabled={isDownloading || activeSelectionIds.length === 0}
+                      disabled={isDownloadingResources || activeResourceSelectionIds.length === 0}
                     >
-                      {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      {isDownloadingResources ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                       下载选中项
+                    </Button>
+                  )}
+                  {activeView === 'requests' && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={downloadSelectedRequests}
+                      disabled={isDownloadingRequests || activeRequestSelectionIds.length === 0}
+                    >
+                      {isDownloadingRequests ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      下载选中请求
                     </Button>
                   )}
                 </div>
@@ -535,12 +646,12 @@ export function ResourceMonitorTab() {
                     <div className="mb-3 flex items-center justify-between border border-border bg-[var(--paper-alt)] px-4 py-3">
                       <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
                         <Checkbox
-                          checked={allChecked}
-                          onCheckedChange={(checked) => toggleAll(Boolean(checked))}
+                          checked={allResourcesChecked}
+                          onCheckedChange={(checked) => toggleAllResources(Boolean(checked))}
                         />
-                        <span>{allChecked ? '已全选' : someChecked ? '部分已选' : '全选资源'}</span>
+                        <span>{allResourcesChecked ? '已全选' : someResourcesChecked ? '部分已选' : '全选资源'}</span>
                       </label>
-                      <Badge variant="info">{activeSelectionIds.length} / {resources.length} 已选</Badge>
+                      <Badge variant="info">{activeResourceSelectionIds.length} / {resources.length} 已选</Badge>
                     </div>
 
                     <div className="overflow-hidden border border-border bg-white">
@@ -560,9 +671,9 @@ export function ResourceMonitorTab() {
                             <TableRow key={resource.id}>
                               <TableCell>
                                 <Checkbox
-                                  checked={Boolean(selectedIds[resource.id])}
+                                  checked={Boolean(selectedResourceIds[resource.id])}
                                   onCheckedChange={(checked) =>
-                                    setSelectedIds((prev) => ({
+                                    setSelectedResourceIds((prev) => ({
                                       ...prev,
                                       [resource.id]: Boolean(checked),
                                     }))
@@ -619,21 +730,44 @@ export function ResourceMonitorTab() {
               {requests.length > 0 ? (
                 <ScrollArea className="min-h-0 flex-1">
                   <div className="p-4">
+                    <div className="mb-3 flex items-center justify-between border border-border bg-[var(--paper-alt)] px-4 py-3">
+                      <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+                        <Checkbox
+                          checked={allRequestsChecked}
+                          onCheckedChange={(checked) => toggleAllRequests(Boolean(checked))}
+                        />
+                        <span>{allRequestsChecked ? '已全选' : someRequestsChecked ? '部分已选' : '全选请求'}</span>
+                      </label>
+                      <Badge variant="info">{activeRequestSelectionIds.length} / {requests.length} 已选</Badge>
+                    </div>
                     <div className="overflow-hidden border border-border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-[68px]">选择</TableHead>
                             <TableHead className="w-[96px]">方法</TableHead>
                             <TableHead className="w-[148px]">状态</TableHead>
                             <TableHead className="w-[120px]">类型</TableHead>
                             <TableHead>请求地址</TableHead>
                             <TableHead className="w-[260px]">摘要</TableHead>
+                            <TableHead className="w-[200px]">文件</TableHead>
                             <TableHead className="w-[180px]">时间</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {requests.map((request) => (
                             <TableRow key={request.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={Boolean(selectedRequestIds[request.id])}
+                                  onCheckedChange={(checked) =>
+                                    setSelectedRequestIds((prev) => ({
+                                      ...prev,
+                                      [request.id]: Boolean(checked),
+                                    }))
+                                  }
+                                />
+                              </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="font-mono">{request.method || '--'}</Badge>
                               </TableCell>
@@ -667,6 +801,19 @@ export function ResourceMonitorTab() {
                                   )}
                                   {request.responseBodyPreview && (
                                     <p className="break-all [overflow-wrap:anywhere]">响应: {request.responseBodyPreview}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="space-y-1">
+                                  <p className="break-all text-sm font-medium text-slate-700 [overflow-wrap:anywhere]">
+                                    {request.suggestedFileName || '--'}
+                                  </p>
+                                  {request.downloaded && <Badge variant="success">已下载</Badge>}
+                                  {request.downloadedPath && (
+                                    <p className="break-all text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                                      {request.downloadedPath}
+                                    </p>
                                   )}
                                 </div>
                               </TableCell>

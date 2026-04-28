@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import mimetypes
@@ -123,6 +124,30 @@ def infer_filename(url, extension, digest):
     return f"{stem}-{digest[:10]}{suffix}"
 
 
+def encode_body_for_download(body):
+    if body is None:
+        return None
+    if isinstance(body, (bytes, bytearray)):
+        return {
+            "kind": "base64",
+            "encoding": "base64",
+            "data": base64.b64encode(bytes(body)).decode("ascii"),
+        }
+    if isinstance(body, (dict, list, tuple, int, float, bool)):
+        return body
+    return str(body)
+
+
+def infer_request_filename(method, url, digest):
+    path_name = Path(urlparse(url).path).name
+    if not path_name:
+        path_name = "request"
+    method_part = sanitize_name((method or "request").lower())
+    name_part = sanitize_name(path_name)
+    stem = f"{method_part}-{Path(name_part).stem}".strip("-") or "request"
+    return f"{stem}-{digest[:10]}.json"
+
+
 class ResourceMonitorWorker:
     def __init__(self):
         self.lock = threading.RLock()
@@ -134,6 +159,8 @@ class ResourceMonitorWorker:
         self.extensions = set()
         self.resources = {}
         self.requests = []
+        self.listen_all_tabs = True
+        self.tab_listeners = {}
 
     def start_listener_thread(self):
         if self.listener_thread and self.listener_thread.is_alive():
@@ -144,14 +171,11 @@ class ResourceMonitorWorker:
 
     def close_browser(self):
         page = self.page
+        self.stop_all_listeners()
         self.page = None
         self.navigation_thread = None
         if page is None:
             return
-        try:
-            page.listen.stop()
-        except Exception:
-            pass
         try:
             page.quit()
         except Exception:
@@ -198,6 +222,9 @@ class ResourceMonitorWorker:
             "responseHeaders": item.get("responseHeaders", {}),
             "requestBodyPreview": item.get("requestBodyPreview", ""),
             "responseBodyPreview": item.get("responseBodyPreview", ""),
+            "suggestedFileName": item.get("suggestedFileName", ""),
+            "downloaded": item.get("downloaded", False),
+            "downloadedPath": item.get("downloadedPath", ""),
             "firstSeenAt": item["firstSeenAt"],
         }
 
@@ -218,6 +245,7 @@ class ResourceMonitorWorker:
         extensions = {normalize_extension(item) for item in payload.get("extensions") or []}
         extensions.discard("")
         download_dir = payload.get("downloadDir") or ""
+        listen_all_tabs = payload.get("listenAllTabs")
 
         if not task_id:
             raise ValueError("taskId 不能为空")
@@ -225,6 +253,9 @@ class ResourceMonitorWorker:
             raise ValueError("至少选择一个文件后缀")
         if not download_dir:
             raise ValueError("downloadDir 不能为空")
+        if listen_all_tabs is None:
+            listen_all_tabs = True
+        listen_all_tabs = bool(listen_all_tabs)
 
         with self.lock:
             self.listener_stop.set()
@@ -232,6 +263,8 @@ class ResourceMonitorWorker:
             self.resources = {}
             self.requests = []
             self.extensions = extensions
+            self.listen_all_tabs = listen_all_tabs
+            self.tab_listeners = {}
             os.makedirs(download_dir, exist_ok=True)
             browser_workspace = os.path.join(download_dir, ".browser")
             os.makedirs(browser_workspace, exist_ok=True)
@@ -240,6 +273,7 @@ class ResourceMonitorWorker:
                 "url": url,
                 "status": "running",
                 "selectedExtensions": sorted(extensions),
+                "listenAllTabs": listen_all_tabs,
                 "downloadDir": download_dir,
                 "createdAt": now_iso(),
                 "updatedAt": now_iso(),
@@ -251,7 +285,7 @@ class ResourceMonitorWorker:
             options.set_download_path(download_dir)
             options.set_tmp_path(browser_workspace)
             self.page = ChromiumPage(options)
-            self.page.listen.start()
+            self.start_listeners_locked()
             self.start_listener_thread()
             if url:
                 self.navigation_thread = threading.Thread(
@@ -280,7 +314,7 @@ class ResourceMonitorWorker:
         with self.lock:
             if not self.page or not self.current_task:
                 raise RuntimeError("当前没有运行中的任务")
-            self.page.listen.pause()
+            self.pause_listeners_locked()
             self.update_status("paused")
             return self.public_task()
 
@@ -288,7 +322,7 @@ class ResourceMonitorWorker:
         with self.lock:
             if not self.page or not self.current_task:
                 raise RuntimeError("当前没有可恢复的任务")
-            self.page.listen.resume()
+            self.resume_listeners_locked()
             self.update_status("running")
             return self.public_task()
 
@@ -305,9 +339,103 @@ class ResourceMonitorWorker:
         with self.lock:
             return self.public_task()
 
+    def start_listeners_locked(self):
+        if self.page is None:
+            return
+        if not self.listen_all_tabs:
+            self.page.listen.start()
+            return
+        self.sync_tab_listeners_locked()
+
+    def pause_listeners_locked(self):
+        if self.page is None:
+            return
+        if not self.listen_all_tabs:
+            self.page.listen.pause()
+            return
+        for tab in list(self.tab_listeners.values()):
+            try:
+                tab.listen.pause()
+            except Exception:
+                pass
+
+    def resume_listeners_locked(self):
+        if self.page is None:
+            return
+        if not self.listen_all_tabs:
+            self.page.listen.resume()
+            return
+        self.sync_tab_listeners_locked()
+        for tab in list(self.tab_listeners.values()):
+            try:
+                tab.listen.resume()
+            except Exception:
+                pass
+
+    def stop_all_listeners(self):
+        if self.listen_all_tabs:
+            for tab in list(self.tab_listeners.values()):
+                try:
+                    tab.listen.stop()
+                except Exception:
+                    pass
+            self.tab_listeners = {}
+            return
+
+        page = self.page
+        if page is None:
+            return
+        try:
+            page.listen.stop()
+        except Exception:
+            pass
+
+    def sync_tab_listeners_locked(self):
+        page = self.page
+        if page is None:
+            return
+
+        try:
+            tab_ids = list(getattr(page, "tab_ids", None) or [])
+        except Exception:
+            return
+
+        active_ids = {str(item) for item in tab_ids}
+        stale_ids = [tab_id for tab_id in self.tab_listeners if tab_id not in active_ids]
+        for tab_id in stale_ids:
+            self.tab_listeners.pop(tab_id, None)
+
+        for raw_tab_id in tab_ids:
+            tab_id = str(raw_tab_id)
+            if tab_id in self.tab_listeners:
+                continue
+            try:
+                tab = page.get_tab(tab_id)
+                tab.listen.start()
+                self.tab_listeners[tab_id] = tab
+            except Exception:
+                event("worker_log", message=f"标签页监听注册失败: {tab_id}")
+
+    def consume_packets(self, packets):
+        if packets is False:
+            return
+
+        for item in packets:
+            if item is False:
+                break
+            batch = item if isinstance(item, list) else [item]
+            for packet in batch:
+                self.handle_packet(packet)
+
     def handle_packet(self, packet):
         request_item = self.build_request_item(packet)
         if request_item:
+            request_item["suggestedFileName"] = infer_request_filename(
+                request_item.get("method", ""),
+                request_item.get("url", ""),
+                request_item["id"],
+            )
+            request_item["_download_payload"] = self.build_request_download_payload(packet, request_item)
             with self.lock:
                 self.requests.insert(0, request_item)
                 if self.current_task:
@@ -436,8 +564,55 @@ class ResourceMonitorWorker:
             "responseHeaders": response_headers,
             "requestBodyPreview": summarize_value(getattr(request_obj, "postData", None)),
             "responseBodyPreview": summarize_value(getattr(response_obj, "body", None)) if response_obj else "",
+            "suggestedFileName": "",
+            "downloaded": False,
+            "downloadedPath": "",
             "firstSeenAt": first_seen_at,
+            "_download_payload": None,
         }
+
+    def build_request_download_payload(self, packet, request_item):
+        request_obj = getattr(packet, "request", None)
+        if request_obj is None or request_item is None:
+            return None
+
+        failed = bool(getattr(packet, "is_failed", False))
+        response_obj = None if failed else getattr(packet, "response", None)
+        fail_info = getattr(packet, "fail_info", None) if failed else None
+
+        payload = {
+            "id": request_item["id"],
+            "tabId": getattr(packet, "tab_id", None),
+            "url": request_item["url"],
+            "method": request_item["method"],
+            "resourceType": request_item.get("resourceType", ""),
+            "mimeType": request_item.get("mimeType", ""),
+            "statusCode": request_item.get("statusCode", 0),
+            "failed": request_item.get("failed", False),
+            "failureText": request_item.get("failureText", ""),
+            "firstSeenAt": request_item["firstSeenAt"],
+            "request": {
+                "headers": request_item.get("requestHeaders", {}),
+                "body": encode_body_for_download(getattr(request_obj, "postData", None)),
+            },
+            "response": None,
+            "failure": None,
+        }
+
+        if response_obj is not None:
+            payload["response"] = {
+                "headers": request_item.get("responseHeaders", {}),
+                "body": encode_body_for_download(getattr(response_obj, "body", None)),
+            }
+
+        if fail_info is not None:
+            payload["failure"] = {
+                "errorText": getattr(fail_info, "errorText", None),
+                "blockedReason": getattr(fail_info, "blockedReason", None),
+                "corsErrorStatus": getattr(fail_info, "corsErrorStatus", None),
+            }
+
+        return payload
 
     def download_resources(self, payload):
         resource_ids = payload.get("resourceIds") or []
@@ -491,24 +666,105 @@ class ResourceMonitorWorker:
         event("resources_downloaded", result)
         return result
 
+    def download_requests(self, payload):
+        request_ids = payload.get("requestIds") or []
+        if not request_ids:
+            raise ValueError("未选择任何请求")
+
+        with self.lock:
+            if not self.current_task:
+                raise RuntimeError("当前没有活动任务")
+            download_dir = self.current_task["downloadDir"]
+
+        requests_dir = os.path.join(download_dir, "requests")
+        os.makedirs(requests_dir, exist_ok=True)
+
+        downloaded_ids = []
+        skipped_ids = []
+        downloaded_entries = []
+
+        for request_id in request_ids:
+            with self.lock:
+                item = next((entry for entry in self.requests if entry["id"] == request_id), None)
+                if not item:
+                    skipped_ids.append(request_id)
+                    continue
+
+                file_name = item.get("suggestedFileName") or infer_request_filename(
+                    item.get("method", ""),
+                    item.get("url", ""),
+                    item["id"],
+                )
+                target_path = os.path.join(requests_dir, file_name)
+
+                if item.get("downloaded") and item.get("downloadedPath") and os.path.exists(item["downloadedPath"]):
+                    skipped_ids.append(request_id)
+                    continue
+                if os.path.exists(target_path):
+                    item["downloaded"] = True
+                    item["downloadedPath"] = target_path
+                    skipped_ids.append(request_id)
+                    continue
+
+                data = item.get("_download_payload")
+                if data is None:
+                    skipped_ids.append(request_id)
+                    continue
+
+            with open(target_path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, ensure_ascii=False, indent=2)
+                fh.write("\n")
+
+            with self.lock:
+                item["downloaded"] = True
+                item["downloadedPath"] = target_path
+                downloaded_ids.append(request_id)
+                downloaded_entries.append(self.public_request(item))
+
+        result = {
+            "taskId": self.current_task["taskId"],
+            "downloadDir": requests_dir,
+            "downloadedIds": downloaded_ids,
+            "skippedIds": skipped_ids,
+            "downloadedEntries": downloaded_entries,
+        }
+        event("requests_downloaded", result)
+        return result
+
     def listen_loop(self):
         while not self.listener_stop.is_set():
             with self.lock:
                 page = self.page
+                listen_all_tabs = self.listen_all_tabs
+                task_status = self.current_task.get("status") if self.current_task else ""
+                if listen_all_tabs:
+                    if task_status != "paused":
+                        self.sync_tab_listeners_locked()
+                    tab_entries = list(self.tab_listeners.items())
+                else:
+                    tab_entries = []
             if page is None:
                 time.sleep(0.1)
                 continue
 
             try:
-                packets = page.listen.steps(timeout=1, gap=1)
-                if packets is False:
-                    continue
-                for item in packets:
-                    if item is False:
-                        break
-                    batch = item if isinstance(item, list) else [item]
-                    for packet in batch:
-                        self.handle_packet(packet)
+                if listen_all_tabs:
+                    if not tab_entries:
+                        time.sleep(0.1)
+                        continue
+
+                    for tab_id, tab in tab_entries:
+                        if self.listener_stop.is_set():
+                            break
+                        try:
+                            packets = tab.listen.steps(timeout=0.2, gap=1)
+                            self.consume_packets(packets)
+                        except Exception:
+                            with self.lock:
+                                self.tab_listeners.pop(tab_id, None)
+                else:
+                    packets = page.listen.steps(timeout=1, gap=1)
+                    self.consume_packets(packets)
             except Exception:
                 if self.listener_stop.is_set():
                     break
@@ -540,6 +796,8 @@ def main():
                 result = worker.current_state() or {}
             elif command_type == "download_resources":
                 result = worker.download_resources(payload)
+            elif command_type == "download_requests":
+                result = worker.download_requests(payload)
             elif command_type == "ping":
                 result = {"pong": True}
             else:

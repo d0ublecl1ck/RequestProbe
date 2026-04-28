@@ -402,7 +402,7 @@ func (s *ResourceMonitorService) GetCurrentTask(ctx context.Context) *models.Res
 }
 
 // StartTask 启动任务
-func (s *ResourceMonitorService) StartTask(ctx context.Context, rawURL string, extensions []string) (*models.ResourceMonitorTask, error) {
+func (s *ResourceMonitorService) StartTask(ctx context.Context, rawURL string, extensions []string, listenAllTabs bool) (*models.ResourceMonitorTask, error) {
 	normalizedURL, err := normalizeURL(rawURL)
 	if err != nil {
 		return nil, err
@@ -442,10 +442,11 @@ func (s *ResourceMonitorService) StartTask(ctx context.Context, rawURL string, e
 	}
 
 	payload := map[string]interface{}{
-		"taskId":      taskID,
-		"url":         normalizedURL,
-		"extensions":  normalizedExts,
-		"downloadDir": downloadDir,
+		"taskId":        taskID,
+		"url":           normalizedURL,
+		"extensions":    normalizedExts,
+		"listenAllTabs": listenAllTabs,
+		"downloadDir":   downloadDir,
 	}
 
 	var task models.ResourceMonitorTask
@@ -575,6 +576,49 @@ func (s *ResourceMonitorService) DownloadResources(ctx context.Context, resource
 	return cloneDownloadResult(&result), nil
 }
 
+// DownloadRequests 下载请求记录
+func (s *ResourceMonitorService) DownloadRequests(ctx context.Context, requestIDs []string) (*models.DownloadRequestsResult, error) {
+	s.mu.RLock()
+	worker := s.worker
+	s.mu.RUnlock()
+
+	if worker == nil {
+		return nil, errors.New("当前没有资源监听任务")
+	}
+
+	ids := normalizeResourceIDs(requestIDs)
+	if len(ids) == 0 {
+		return nil, errors.New("未选择任何请求")
+	}
+
+	var result models.DownloadRequestsResult
+	if err := worker.request(ctx, "download_requests", map[string]interface{}{"requestIds": ids}, &result); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.task != nil {
+		for _, downloaded := range result.DownloadedEntries {
+			for _, item := range s.task.Requests {
+				if item.ID == downloaded.ID {
+					item.Downloaded = downloaded.Downloaded
+					item.DownloadedPath = downloaded.DownloadedPath
+				}
+			}
+		}
+		s.task.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+
+	s.emitLocked(&models.ResourceMonitorEvent{
+		Type:            "requests_downloaded",
+		Task:            cloneTask(s.task),
+		RequestDownload: cloneRequestDownloadResult(&result),
+	})
+
+	return cloneRequestDownloadResult(&result), nil
+}
+
 // OpenDownloadDir 用 Finder 或 VS Code 打开目录
 func (s *ResourceMonitorService) OpenDownloadDir(ctx context.Context, opener string) error {
 	s.mu.RLock()
@@ -688,6 +732,26 @@ func (s *ResourceMonitorService) handleWorkerEvent(msg pythonMessage) {
 			Type:    "request_detected",
 			Task:    cloneTask(s.task),
 			Request: cloneRequest(payload.Request),
+		})
+	case "requests_downloaded":
+		var result models.DownloadRequestsResult
+		if err := json.Unmarshal(msg.Payload, &result); err != nil {
+			return
+		}
+		if s.task != nil {
+			for _, downloaded := range result.DownloadedEntries {
+				for _, item := range s.task.Requests {
+					if item.ID == downloaded.ID {
+						item.Downloaded = downloaded.Downloaded
+						item.DownloadedPath = downloaded.DownloadedPath
+					}
+				}
+			}
+		}
+		s.emitLocked(&models.ResourceMonitorEvent{
+			Type:            "requests_downloaded",
+			Task:            cloneTask(s.task),
+			RequestDownload: cloneRequestDownloadResult(&result),
 		})
 	case "resources_downloaded":
 		var result models.DownloadResourcesResult
@@ -853,6 +917,20 @@ func cloneRequest(request *models.MonitoredRequest) *models.MonitoredRequest {
 		for key, value := range request.ResponseHeaders {
 			cloned.ResponseHeaders[key] = value
 		}
+	}
+	return &cloned
+}
+
+func cloneRequestDownloadResult(result *models.DownloadRequestsResult) *models.DownloadRequestsResult {
+	if result == nil {
+		return nil
+	}
+	cloned := *result
+	cloned.DownloadedIDs = append([]string(nil), result.DownloadedIDs...)
+	cloned.SkippedIDs = append([]string(nil), result.SkippedIDs...)
+	cloned.DownloadedEntries = make([]*models.MonitoredRequest, 0, len(result.DownloadedEntries))
+	for _, item := range result.DownloadedEntries {
+		cloned.DownloadedEntries = append(cloned.DownloadedEntries, cloneRequest(item))
 	}
 	return &cloned
 }

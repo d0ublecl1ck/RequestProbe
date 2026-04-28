@@ -17,6 +17,7 @@ type ResourceMonitorTask struct {
 	URL                string                `json:"url"`
 	Status             ResourceMonitorStatus `json:"status"`
 	SelectedExtensions []string              `json:"selectedExtensions"`
+	ListenAllTabs      bool                  `json:"listenAllTabs"`
 	DownloadDir        string                `json:"downloadDir"`
 	CreatedAt          string                `json:"createdAt"`
 	UpdatedAt          string                `json:"updatedAt"`
@@ -55,6 +56,9 @@ type MonitoredRequest struct {
 	ResponseHeaders     map[string]string `json:"responseHeaders,omitempty"`
 	RequestBodyPreview  string            `json:"requestBodyPreview,omitempty"`
 	ResponseBodyPreview string            `json:"responseBodyPreview,omitempty"`
+	SuggestedFileName   string            `json:"suggestedFileName,omitempty"`
+	Downloaded          bool              `json:"downloaded"`
+	DownloadedPath      string            `json:"downloadedPath,omitempty"`
 	FirstSeenAt         string            `json:"firstSeenAt"`
 }
 
@@ -67,12 +71,22 @@ type DownloadResourcesResult struct {
 	DownloadedEntries []*MonitoredResource `json:"downloadedEntries"`
 }
 
+// DownloadRequestsResult 表示批量下载请求结果
+type DownloadRequestsResult struct {
+	TaskID            string              `json:"taskId"`
+	DownloadDir       string              `json:"downloadDir"`
+	DownloadedIDs     []string            `json:"downloadedIds"`
+	SkippedIDs        []string            `json:"skippedIds"`
+	DownloadedEntries []*MonitoredRequest `json:"downloadedEntries"`
+}
+
 // ResourceMonitorEvent 表示推送给前端的事件
 type ResourceMonitorEvent struct {
-	Type     string                   `json:"type"`
-	Message  string                   `json:"message,omitempty"`
-	Task     *ResourceMonitorTask     `json:"task,omitempty"`
-	Resource *MonitoredResource       `json:"resource,omitempty"`
-	Request  *MonitoredRequest        `json:"request,omitempty"`
-	Download *DownloadResourcesResult `json:"download,omitempty"`
+	Type            string                   `json:"type"`
+	Message         string                   `json:"message,omitempty"`
+	Task            *ResourceMonitorTask     `json:"task,omitempty"`
+	Resource        *MonitoredResource       `json:"resource,omitempty"`
+	Request         *MonitoredRequest        `json:"request,omitempty"`
+	Download        *DownloadResourcesResult `json:"download,omitempty"`
+	RequestDownload *DownloadRequestsResult  `json:"requestDownload,omitempty"`
 }

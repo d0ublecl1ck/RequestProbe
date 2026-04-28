@@ -222,8 +222,8 @@ func (a *App) GetResourceMonitorTask() *models.ResourceMonitorTask {
 }
 
 // StartResourceMonitor 启动资源监听任务
-func (a *App) StartResourceMonitor(rawURL string, extensions []string) (*models.ResourceMonitorTask, error) {
-	return a.resourceMonitorService.StartTask(a.ctx, rawURL, extensions)
+func (a *App) StartResourceMonitor(rawURL string, extensions []string, listenAllTabs bool) (*models.ResourceMonitorTask, error) {
+	return a.resourceMonitorService.StartTask(a.ctx, rawURL, extensions, listenAllTabs)
 }
 
 // PauseResourceMonitor 暂停资源监听
@@ -244,6 +244,11 @@ func (a *App) EndResourceMonitor() (*models.ResourceMonitorTask, error) {
 // DownloadSelectedResources 下载选中的资源
 func (a *App) DownloadSelectedResources(resourceIDs []string) (*models.DownloadResourcesResult, error) {
 	return a.resourceMonitorService.DownloadResources(a.ctx, resourceIDs)
+}
+
+// DownloadSelectedRequests 下载选中的请求记录
+func (a *App) DownloadSelectedRequests(requestIDs []string) (*models.DownloadRequestsResult, error) {
+	return a.resourceMonitorService.DownloadRequests(a.ctx, requestIDs)
 }
 
 // OpenResourceMonitorDownloadDir 打开资源监听下载目录

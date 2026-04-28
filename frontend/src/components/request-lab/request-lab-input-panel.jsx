@@ -3,12 +3,10 @@ import { Loader2, Play, RefreshCcw, ScanSearch, Trash2, Wand2 } from 'lucide-rea
 
 import { Button } from '../ui/button.jsx';
 import { Input } from '../ui/input.jsx';
-import { ScrollArea } from '../ui/scroll-area.jsx';
 import { Separator } from '../ui/separator.jsx';
 import { Textarea } from '../ui/textarea.jsx';
 import { Badge } from '../ui/badge.jsx';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group.jsx';
-import { CardFooter } from '../ui/card.jsx';
 import { ContainerCard } from '../shared/container-card.jsx';
 import { FormSection } from '../shared/form-section.jsx';
 
@@ -54,11 +52,11 @@ export function RequestLabInputPanel({
       title="输入与校验"
       description="选择输入来源、粘贴原始请求，并定义后续测试要使用的验证条件。"
       icon={ScanSearch}
-      className="flex min-h-[420px] min-w-0 flex-col xl:h-full xl:min-h-0"
+      className="flex min-h-[420px] min-w-0 flex-col xl:col-span-2 xl:min-h-0"
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
     >
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-4 p-4">
+      <div className="grid min-h-0 flex-1 gap-4 p-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+        <div className={`flex min-w-0 flex-col gap-4 ${parsedRequest ? '' : 'xl:col-span-2'}`}>
           <FormSection title="输入类型">
             <RadioGroup value={inputType} onValueChange={onInputTypeChange} className="grid grid-cols-3 gap-2">
               {INPUT_TYPE_OPTIONS.map((option) => (
@@ -86,15 +84,21 @@ export function RequestLabInputPanel({
               value={inputText}
               onChange={(event) => onInputTextChange(event.target.value)}
               placeholder="请输入 HTTP 请求或 Curl 命令..."
-              className="min-h-[220px] resize-none bg-white"
+              className="min-h-[260px] resize-none bg-white"
             />
           </FormSection>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={`grid gap-3 ${parsedRequest ? 'md:grid-cols-3' : 'sm:grid-cols-2'}`}>
             <Button variant="default" className="gap-2" onClick={onParseRequest} disabled={isParsing}>
               {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
               {isParsing ? '解析中...' : '解析请求'}
             </Button>
+            {parsedRequest ? (
+              <Button variant="secondary" className="gap-2" onClick={onSingleTest} disabled={isSingleTesting}>
+                {isSingleTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {isSingleTesting ? '测试中...' : '测试请求'}
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               className="gap-2"
@@ -105,174 +109,163 @@ export function RequestLabInputPanel({
               清空输入
             </Button>
           </div>
-
-          {parsedRequest ? (
-            <>
-              <Separator />
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">验证配置</p>
-                </div>
-
-                <FormSection title="验证方式">
-                  <RadioGroup value={validationType} onValueChange={onValidationTypeChange} className="grid grid-cols-2 gap-2">
-                    {VALIDATION_TYPE_OPTIONS.map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-foreground transition hover:border-foreground"
-                      >
-                        <span>{option.label}</span>
-                        <RadioGroupItem value={option.value} />
-                      </label>
-                    ))}
-                  </RadioGroup>
-                </FormSection>
-
-                {validationType === 'textMatching' ? (
-                  <FormSection title="文本匹配">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">匹配模式</p>
-                        <RadioGroup value={validationConfig.textMatching.matchMode} onValueChange={(value) => onValidationConfigChange((prev) => ({
-                          ...prev,
-                          textMatching: { ...prev.textMatching, matchMode: value },
-                        }))} className="grid grid-cols-2 gap-2">
-                          {MATCH_MODE_OPTIONS.map((option) => (
-                            <label
-                              key={option.value}
-                              className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em]"
-                            >
-                              <span>{option.label}</span>
-                              <RadioGroupItem value={option.value} />
-                            </label>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">区分大小写</p>
-                        <label className="flex items-center gap-2 border border-border bg-white px-3 py-3 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={validationConfig.textMatching.caseSensitive}
-                            onChange={(event) => onValidationConfigChange((prev) => ({
-                              ...prev,
-                              textMatching: { ...prev.textMatching, caseSensitive: event.target.checked },
-                            }))}
-                          />
-                          <span>大小写敏感</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">匹配文本</p>
-                      <Textarea
-                        value={textMatchingInput}
-                        onChange={(event) => onTextMatchingChange(event.target.value)}
-                        placeholder="每行一个匹配文本，例如 success"
-                        className="min-h-[120px] bg-white"
-                      />
-                    </div>
-                  </FormSection>
-                ) : null}
-
-                {validationType === 'lengthRange' ? (
-                  <FormSection title="响应长度">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">最小长度</p>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={validationConfig.lengthRange.minLength}
-                          onChange={(event) => onValidationConfigChange((prev) => ({
-                            ...prev,
-                            lengthRange: {
-                              ...prev.lengthRange,
-                              minLength: Number(event.target.value || 0),
-                            },
-                          }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">最大长度</p>
-                        <Input
-                          type="number"
-                          min={-1}
-                          value={validationConfig.lengthRange.maxLength}
-                          onChange={(event) => onValidationConfigChange((prev) => ({
-                            ...prev,
-                            lengthRange: {
-                              ...prev.lengthRange,
-                              maxLength: Number(event.target.value || 0),
-                            },
-                          }))}
-                        />
-                      </div>
-                    </div>
-                  </FormSection>
-                ) : null}
-
-                <Separator />
-
-                <FormSection title="请求参数">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">超时时间(秒)</p>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={300}
-                        value={validationConfig.timeout}
-                        onChange={(event) => onValidationConfigChange((prev) => ({
-                          ...prev,
-                          timeout: Number(event.target.value || 0),
-                        }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">重试次数</p>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={10}
-                        value={validationConfig.maxRetries}
-                        onChange={(event) => onValidationConfigChange((prev) => ({
-                          ...prev,
-                          maxRetries: Number(event.target.value || 0),
-                        }))}
-                      />
-                    </div>
-                  </div>
-                </FormSection>
-              </div>
-            </>
-          ) : null}
         </div>
-      </ScrollArea>
 
-      {parsedRequest ? (
-        <CardFooter className="sticky-actions bg-white/90">
-          <div className="grid w-full gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Button variant="secondary" className="gap-2" onClick={onSingleTest} disabled={isSingleTesting}>
-              {isSingleTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {isSingleTesting ? '测试中...' : '测试请求'}
-            </Button>
-            <Button
-              variant="default"
-              className="gap-2"
-              onClick={onFieldAnalysis}
-              disabled={!parsedRequest || isTestRunning}
-            >
-              {isTestRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
-              字段分析
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={onClearAll} disabled={!parsedRequest}>
-              <RefreshCcw className="h-4 w-4" />
-              清空结果
-            </Button>
+        {parsedRequest ? (
+          <div className="flex min-w-0 flex-col gap-4 border-t border-border pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">验证配置</p>
+            </div>
+
+            <FormSection title="验证方式">
+              <RadioGroup value={validationType} onValueChange={onValidationTypeChange} className="grid grid-cols-2 gap-2">
+                {VALIDATION_TYPE_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-foreground transition hover:border-foreground"
+                  >
+                    <span>{option.label}</span>
+                    <RadioGroupItem value={option.value} />
+                  </label>
+                ))}
+              </RadioGroup>
+            </FormSection>
+
+            {validationType === 'textMatching' ? (
+              <FormSection title="文本匹配">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">匹配模式</p>
+                    <RadioGroup value={validationConfig.textMatching.matchMode} onValueChange={(value) => onValidationConfigChange((prev) => ({
+                      ...prev,
+                      textMatching: { ...prev.textMatching, matchMode: value },
+                    }))} className="grid grid-cols-2 gap-2">
+                      {MATCH_MODE_OPTIONS.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex items-center justify-between border border-border bg-white px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em]"
+                        >
+                          <span>{option.label}</span>
+                          <RadioGroupItem value={option.value} />
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">区分大小写</p>
+                    <label className="flex items-center gap-2 border border-border bg-white px-3 py-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={validationConfig.textMatching.caseSensitive}
+                        onChange={(event) => onValidationConfigChange((prev) => ({
+                          ...prev,
+                          textMatching: { ...prev.textMatching, caseSensitive: event.target.checked },
+                        }))}
+                      />
+                      <span>大小写敏感</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">匹配文本</p>
+                  <Textarea
+                    value={textMatchingInput}
+                    onChange={(event) => onTextMatchingChange(event.target.value)}
+                    placeholder="每行一个匹配文本，例如 success"
+                    className="min-h-[120px] bg-white"
+                  />
+                </div>
+              </FormSection>
+            ) : null}
+
+            {validationType === 'lengthRange' ? (
+              <FormSection title="响应长度">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">最小长度</p>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={validationConfig.lengthRange.minLength}
+                      onChange={(event) => onValidationConfigChange((prev) => ({
+                        ...prev,
+                        lengthRange: {
+                          ...prev.lengthRange,
+                          minLength: Number(event.target.value || 0),
+                        },
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">最大长度</p>
+                    <Input
+                      type="number"
+                      min={-1}
+                      value={validationConfig.lengthRange.maxLength}
+                      onChange={(event) => onValidationConfigChange((prev) => ({
+                        ...prev,
+                        lengthRange: {
+                          ...prev.lengthRange,
+                          maxLength: Number(event.target.value || 0),
+                        },
+                      }))}
+                    />
+                  </div>
+                </div>
+              </FormSection>
+            ) : null}
+
+            <Separator />
+
+            <FormSection title="请求参数">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">超时时间(秒)</p>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={300}
+                    value={validationConfig.timeout}
+                    onChange={(event) => onValidationConfigChange((prev) => ({
+                      ...prev,
+                      timeout: Number(event.target.value || 0),
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">重试次数</p>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={validationConfig.maxRetries}
+                    onChange={(event) => onValidationConfigChange((prev) => ({
+                      ...prev,
+                      maxRetries: Number(event.target.value || 0),
+                    }))}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={onFieldAnalysis}
+                disabled={!parsedRequest || isTestRunning}
+              >
+                {isTestRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
+                字段分析
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={onClearAll} disabled={!parsedRequest}>
+                <RefreshCcw className="h-4 w-4" />
+                清空结果
+              </Button>
+            </div>
           </div>
-        </CardFooter>
-      ) : null}
+        ) : null}
+      </div>
     </ContainerCard>
   );
 }
